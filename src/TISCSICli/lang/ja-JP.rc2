@@ -1,0 +1,121 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 A1ive
+//
+// Japanese (Japan). Missing entries fall back to en-US.
+
+#pragma code_page(65001)
+
+LANGUAGE LANG_JAPANESE, SUBLANG_JAPANESE_JAPAN
+
+STRINGTABLE
+BEGIN
+    IDS_CLI_USAGE "使い方: TISCSICli [オプション] [--target <名前>] <ディスク>... [--target <名前> <ディスク>...]...\n\n\
+ディスク イメージや RAM ディスクを iSCSI イニシエーターに提供します。\n\n\
+ディスク (指定した順に、現在のターゲットの LUN になります):\n\
+  --image <パス>       ディスク イメージ (読み書き可能。.vhd、.vmdk、その他の拡張子は RAW)\n\
+  --image-ro <パス>    ディスク イメージ (読み取り専用)\n\
+  --ram <サイズ>       新しい RAM ディスク (例: 512M、2G)\n\
+  --disk <番号>        物理ディスク (読み書き可能。ディスク上のボリュームをロックします)\n\
+  --disk-ro <番号>     物理ディスク (読み取り専用)\n\
+  --volume <ボリューム> ボリューム (E:、マウント ポイント、\\\\?\\Volume{...}\\。読み書き可能)\n\
+  --volume-ro <ボリューム> ボリューム (読み取り専用)\n\
+  --dynamic-volume <ID>\n\
+                       ダイナミック ボリューム (GUID、Volume1 などの名前、E:。\n\
+                       読み書き可能)。Windows がマウントしていないボリュームも使えます\n\
+  --dynamic-volume-ro <ID>\n\
+                       ダイナミック ボリューム (読み取り専用)\n\
+  --ldm-disk <イメージ> 物理ディスクの代わりに、メンバー ディスクのこのイメージから\n\
+                       ダイナミック ボリュームを探します (メンバーごとに指定します)\n\n\
+ターゲット:\n\
+  --target <名前>      新しいターゲットを開始します。以降のディスクはこのターゲットに属します。\n\
+                       --target より前に指定したディスクは\n\
+                       iqn.1991-05.com.microsoft:target1 に属します。\n\
+  --spti <デバイス>    ターゲットの SCSI コマンドをローカル デバイスにパススルーします\n\
+                       (\\\\.\\CdRom0、\\\\.\\Tape0、\\\\.\\Scsi2: など)\n\
+  --list               物理ディスク、ボリューム、ダイナミック ボリューム、SCSI デバイスを\n\
+                       一覧表示します (ディスク、ボリューム、--spti には管理者権限が\n\
+                       必要です。--ldm-disk のダイナミック ボリュームを除く)\n\n\
+VHD の作成 (ディスクも指定した場合のみ、続けてサーバーを開始します):\n\
+  --create-vhd <パス>  新しい VHD ファイルを作成します\n\
+  --size <サイズ>      新しい VHD のサイズ (例: 20G、最大 2040G)\n\
+  --dynamic            容量可変の VHD を作成します (既定: 容量固定)\n\n\
+サーバー:\n\
+  --listen <アドレス>  待ち受ける IPv4 アドレス (既定: すべてのインターフェイス)\n\
+  --port <ポート>      TCP ポート (既定: 3260)\n\
+  --log <ファイル>     ログをファイルにも書き込みます\n\
+  --verbosity <レベル> error、warning、info (既定)、verbose、debug のいずれか\n\
+  --lang <タグ>        表示言語: en-US、ja-JP、zh-CN、zh-TW、ko-KR\n\
+                       (既定: Windows の表示言語)\n\
+  --help               このヘルプを表示します\n\n\
+例:\n\
+  TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
+  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n"
+    IDS_CLI_LISTENING "{0}:{1} で待ち受けています"
+    IDS_CLI_TARGET "ターゲット: {0}"
+    IDS_CLI_LUN "  LUN {0}: {1}、{2}{3}"
+    IDS_CLI_READ_ONLY " (読み取り専用)"
+    IDS_CLI_RAM_DISK "RAM ディスク"
+    IDS_CLI_PRESS_CTRL_C "Ctrl+C キーを押すとサーバーを停止します。"
+    IDS_CLI_STOPPING "サーバーを停止しています..."
+    IDS_CLI_STOPPED "サーバーを停止しました。"
+    IDS_CLI_CREATING "{0} を作成しています ({1}、{2})..."
+    IDS_CLI_CREATED "{0} を作成しました。"
+    IDS_CLI_VHD_FIXED "容量固定"
+    IDS_CLI_VHD_DYNAMIC "容量可変"
+    IDS_CLI_PHYSICAL_DISK "物理ディスク {0}"
+    IDS_CLI_VOLUME "ボリューム {0}"
+    IDS_CLI_SPTI "  {0} への SCSI パススルー (LUN 数: {1})"
+    IDS_CLI_HINT_ADMIN "物理ディスク、ボリューム、SCSI パススルーを使うには、管理者として実行する必要があります。"
+    IDS_CLI_LIST_DISKS "物理ディスク:"
+    IDS_CLI_LIST_DISK "  {0}: {1}、{2}{3}"
+    IDS_CLI_LIST_DYNAMIC " (ダイナミック ディスク)"
+    IDS_CLI_LIST_VOLUMES "ボリューム:"
+    IDS_CLI_LIST_VOLUME "  {0}\n    マウント先: {1}、ファイル システム: {2}、ラベル: {3}、サイズ: {4}、ディスク: {5}"
+    IDS_CLI_LIST_SCSI "SCSI デバイス:"
+    IDS_CLI_LIST_DYNAMIC_VOLUMES "ダイナミック ボリューム:"
+    IDS_CLI_LIST_DYNAMIC_VOLUME "  {0}  {1}\n    ディスク グループ: {2}、レイアウト: {3}、状態: {4}、サイズ: {5}、ディスク: {6}\n    {7}"
+    IDS_CLI_LIST_WINDOWS_VOLUME "Windows のボリューム: {0}"
+    IDS_CLI_LIST_NOT_MOUNTED "Windows はマウントしていません。メンバー ディスクから直接提供します"
+    IDS_CLI_DYNAMIC_VOLUME "ダイナミック ボリューム {0}"
+    IDS_CLI_LAYOUT_SIMPLE "シンプル"
+    IDS_CLI_LAYOUT_SPANNED "スパン"
+    IDS_CLI_LAYOUT_STRIPED "ストライプ"
+    IDS_CLI_LAYOUT_MIRRORED "ミラー"
+    IDS_CLI_LAYOUT_RAID5 "RAID-5"
+    IDS_CLI_HEALTH_HEALTHY "正常"
+    IDS_CLI_HEALTH_FAILED_REDUNDANCY "冗長性なし"
+    IDS_CLI_HEALTH_FAILED "エラー"
+
+    IDS_CLI_ERR_UNKNOWN_OPTION "不明なオプションです: {0}"
+    IDS_CLI_ERR_MISSING_VALUE "オプション {0} には値が必要です。"
+    IDS_CLI_ERR_INVALID_SIZE "サイズが無効です: {0}"
+    IDS_CLI_ERR_INVALID_PORT "ポート番号が無効です: {0}"
+    IDS_CLI_ERR_INVALID_ADDRESS "IPv4 アドレスが無効です: {0}"
+    IDS_CLI_ERR_INVALID_LEVEL "ログ レベルが無効です: {0}"
+    IDS_CLI_ERR_INVALID_TARGET_NAME "iSCSI ターゲット名が無効です: {0}"
+    IDS_CLI_ERR_DUPLICATE_TARGET "ターゲット名が重複しています: {0}"
+    IDS_CLI_ERR_NO_DISKS "ディスクが指定されていません。--image、--image-ro、または --ram を使用してください。"
+    IDS_CLI_ERR_TARGET_WITHOUT_DISKS "ターゲット {0} にディスクがありません。"
+    IDS_CLI_ERR_OPEN_IMAGE "ディスク イメージ {0} を開けません: {1}"
+    IDS_CLI_ERR_RAM_ALLOC "{0} の RAM ディスクを確保できません。"
+    IDS_CLI_ERR_LOG_FILE "ログ ファイル {0} を開けません: {1}"
+    IDS_CLI_ERR_START "サーバーを開始できません: {0}"
+    IDS_CLI_ERR_HINT_HELP "使い方は TISCSICli --help で確認できます。"
+    IDS_CLI_ERR_VHD_SIZE "VHD のサイズが無効です: {0} (512 バイトの倍数で、最大 2040 GiB)"
+    IDS_CLI_ERR_CREATE_NEEDS_SIZE "--create-vhd には --size が必要です。"
+    IDS_CLI_ERR_SIZE_WITHOUT_CREATE "--size と --dynamic は --create-vhd と一緒にのみ使用できます。"
+    IDS_CLI_ERR_CREATE "{0} を作成できません: {1}"
+    IDS_CLI_ERR_INVALID_DISK "ディスク番号が無効です: {0} (--list で確認できます)"
+    IDS_CLI_ERR_SPTI_MIXED "ターゲット {0}: --spti はディスクや別の --spti と組み合わせることはできません。"
+    IDS_CLI_ERR_OPEN_SPTI "SCSI デバイス {0} を開けません: {1}"
+    IDS_CLI_ERR_DYNAMIC_DISK "{0} はダイナミック ディスクです。イニシエーターから書き込むとダイナミック ディスクのデータベースが壊れるおそれがあるため、読み取り専用 (--disk-ro) で提供してください。"
+    IDS_CLI_ERR_VOLUME_LOCKED "ボリューム {0} を排他的にロックできません ({1})。使用中のプログラムを閉じるか、読み取り専用で提供してください。"
+    IDS_CLI_ERR_ALREADY_SERVED "{0} は既に提供されています。"
+    IDS_CLI_ERR_WRITE_PROTECTED "{0} は書き込み禁止です。読み取り専用で提供してください。"
+    IDS_CLI_ERR_OPEN_DEVICE "「{0}」を開けません: {1}"
+    IDS_CLI_ERR_NO_SUCH_VOLUME "「{0}」に一致するダイナミック ボリュームがありません (--list を参照してください)。"
+    IDS_CLI_ERR_AMBIGUOUS_VOLUME "「{0}」という名前のダイナミック ボリュームが複数あります。GUID で指定してください (--list を参照してください)。"
+    IDS_CLI_ERR_VOLUME_FAILED "ダイナミック ボリューム「{0}」は使用できません: データを持つディスクが見つかりません。"
+    IDS_CLI_ERR_DEGRADED_WRITE "ダイナミック ボリューム「{0}」はメンバー ディスクが欠けています。書き込むとメンバー間の整合性が失われるため、読み取り専用で提供してください (--dynamic-volume-ro)。"
+    IDS_CLI_ERR_LDM_UNUSED "--ldm-disk は --dynamic-volume、--dynamic-volume-ro、または --list と一緒に指定してください。"
+END

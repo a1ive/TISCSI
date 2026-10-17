@@ -1,0 +1,214 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 A1ive
+//
+// English (United States). This is the reference and fallback language:
+// every localized resource must be defined here. {0}, {1}, ... are
+// std::format arguments.
+
+#pragma code_page(65001)
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+IDR_MAINMENU MENU
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "E&xit", IDM_FILE_EXIT
+    END
+    POPUP "&View"
+    BEGIN
+        POPUP "&Language"
+        BEGIN
+            MENUITEM "&Automatic", IDM_LANG_AUTO
+            MENUITEM SEPARATOR
+        END
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&About TISCSI...", IDM_HELP_ABOUT
+    END
+END
+
+IDD_MAIN DIALOGEX 0, 0, 300, 120
+STYLE DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+CAPTION "TISCSI"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "&IP address:", IDC_STATIC, 7, 9, 45, 8
+    COMBOBOX        IDC_ADDRESS, 54, 7, 92, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "TCP &port:", IDC_STATIC, 153, 9, 37, 8
+    EDITTEXT        IDC_PORT, 191, 7, 35, 13, ES_NUMBER | ES_AUTOHSCROLL
+    PUSHBUTTON      "&Start", IDC_START, 233, 6, 60, 15
+    LTEXT           "&Targets:", IDC_STATIC, 7, 30, 45, 8
+    CONTROL         "", IDC_TARGETS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 40, 219, 74
+    PUSHBUTTON      "&Add Target...", IDC_ADD_TARGET, 233, 40, 60, 15
+    PUSHBUTTON      "&Remove Target", IDC_REMOVE_TARGET, 233, 58, 60, 15
+END
+
+IDD_ADD_TARGET DIALOGEX 0, 0, 316, 152
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Add iSCSI Target"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "Target &name:", IDC_STATIC, 7, 9, 50, 8
+    EDITTEXT        IDC_TARGET_NAME, 58, 7, 172, 13, ES_AUTOHSCROLL
+    LTEXT           "&Disks:", IDC_STATIC, 7, 27, 50, 8
+    CONTROL         "", IDC_DISKS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 58, 26, 172, 102
+    PUSHBUTTON      "Create &Virtual Disk...", IDC_CREATE_VHD, 236, 26, 73, 14
+    PUSHBUTTON      "Create &RAM Disk...", IDC_CREATE_RAMDISK, 236, 43, 73, 14
+    PUSHBUTTON      "Add Disk &Image...", IDC_ADD_IMAGE, 236, 60, 73, 14
+    PUSHBUTTON      "Add &Physical Disk...", IDC_ADD_PHYSICAL, 236, 77, 73, 14
+    PUSHBUTTON      "Add V&olume...", IDC_ADD_VOLUME, 236, 94, 73, 14
+    PUSHBUTTON      "Re&move", IDC_REMOVE_DISK, 236, 111, 73, 14
+    DEFPUSHBUTTON   "OK", IDOK, 202, 133, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 259, 133, 50, 14
+END
+
+IDD_SELECT_IMAGE DIALOGEX 0, 0, 244, 64
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Add Disk Image"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "&File:", IDC_STATIC, 7, 9, 26, 8
+    EDITTEXT        IDC_PATH, 35, 7, 146, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "&Browse...", IDC_BROWSE, 187, 6, 50, 15
+    AUTOCHECKBOX    "&Read-only", IDC_READ_ONLY, 35, 27, 120, 10
+    DEFPUSHBUTTON   "OK", IDOK, 130, 44, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 187, 44, 50, 14
+END
+
+IDD_CREATE_VHD DIALOGEX 0, 0, 244, 96
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Create Virtual Disk"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "&File:", IDC_STATIC, 7, 9, 26, 8
+    EDITTEXT        IDC_PATH, 35, 7, 146, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "&Browse...", IDC_BROWSE, 187, 6, 50, 15
+    LTEXT           "&Size:", IDC_STATIC, 7, 28, 26, 8
+    EDITTEXT        IDC_SIZE_MB, 35, 26, 60, 13, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 95, 26, 10, 13
+    LTEXT           "MB", IDC_STATIC, 100, 28, 20, 8
+    AUTOCHECKBOX    "&Dynamically expanding", IDC_DYNAMIC, 35, 45, 160, 10
+    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 61, 230, 9
+    DEFPUSHBUTTON   "OK", IDOK, 130, 76, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 187, 76, 50, 14
+END
+
+IDD_CREATE_RAMDISK DIALOGEX 0, 0, 180, 50
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Create RAM Disk"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "&Size:", IDC_STATIC, 7, 9, 26, 8
+    EDITTEXT        IDC_SIZE_MB, 35, 7, 60, 13, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 95, 7, 10, 13
+    LTEXT           "MB", IDC_STATIC, 100, 9, 20, 8
+    DEFPUSHBUTTON   "OK", IDOK, 66, 30, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 123, 30, 50, 14
+END
+
+IDD_SELECT_PHYSICAL DIALOGEX 0, 0, 316, 150
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Add Physical Disk"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    CONTROL         "", IDC_DEVICE_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 302, 116
+    AUTOCHECKBOX    "&Read-only", IDC_READ_ONLY, 7, 132, 120, 10
+    DEFPUSHBUTTON   "OK", IDOK, 202, 130, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 259, 130, 50, 14
+END
+
+IDD_SELECT_VOLUME DIALOGEX 0, 0, 380, 150
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Add Volume"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    CONTROL         "", IDC_DEVICE_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 366, 116
+    AUTOCHECKBOX    "&Read-only", IDC_READ_ONLY, 7, 132, 120, 10
+    DEFPUSHBUTTON   "OK", IDOK, 266, 130, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 323, 130, 50, 14
+END
+
+IDD_ABOUT DIALOGEX 0, 0, 260, 118
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About TISCSI"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    ICON            IDI_APP, IDC_STATIC, 10, 10, 20, 20
+    LTEXT           "TISCSI", IDC_STATIC, 42, 10, 208, 8
+    LTEXT           "", IDC_ABOUT_VERSION, 42, 22, 208, 8
+    LTEXT           "Copyright (C) 2026 A1ive", IDC_STATIC, 42, 34, 208, 8
+    LTEXT           "Based on iSCSI Console by Tal Aloni.", IDC_STATIC, 42, 46, 208, 8
+    LTEXT           "This program is free software, distributed under the terms of the GNU General Public License, version 3 or (at your option) any later version.", IDC_STATIC, 42, 62, 208, 26
+    DEFPUSHBUTTON   "OK", IDOK, 200, 96, 50, 14
+END
+
+STRINGTABLE
+BEGIN
+    IDS_APP_TITLE           "TISCSI"
+    IDS_ABOUT_VERSION       "Version {0}"
+    IDS_USAGE               "Command line options:\n\n/log\tWrite a log file to the program directory\n--log=<file>\tWrite a log to the given file\n--lang=<tag>\tUser interface language (en-US, ja-JP, zh-CN, zh-TW, ko-KR)"
+    IDS_ERR_LOG_FILE        "Cannot open the log file {0}:\n{1}"
+
+    IDS_ANY_ADDRESS         "Any"
+    IDS_START               "&Start"
+    IDS_STOP                "&Stop"
+    IDS_COL_TARGET          "Target"
+    IDS_COL_LUNS            "LUNs"
+    IDS_COL_SESSIONS        "Sessions"
+    IDS_STATUS_STOPPED      "The server is stopped."
+    IDS_STATUS_RUNNING      "Listening on {0}:{1} - {2} active session(s)"
+    IDS_STATUS_NOT_ADMIN    "Physical disks and volumes require administrator rights and are disabled."
+    IDS_ERR_INVALID_PORT    "Enter a TCP port between 1 and 65535."
+    IDS_ERR_START           "Cannot start the server:\n{0}"
+    IDS_ERR_TARGET_EXISTS   "A target named {0} already exists."
+    IDS_ERR_TARGET_IN_USE   "The target {0} is in use and cannot be removed."
+    IDS_CONFIRM_EXIT        "Initiators are still connected. Stop the server and exit?"
+
+    IDS_COL_DESCRIPTION     "Description"
+    IDS_COL_SIZE            "Size"
+    IDS_DESC_RAM_DISK       "RAM disk"
+    IDS_DESC_PHYSICAL_DISK  "Physical disk {0}"
+    IDS_DESC_VOLUME         "Volume {0}"
+    IDS_READ_ONLY_SUFFIX    " (read-only)"
+    IDS_ERR_INVALID_TARGET_NAME "The target name is not a valid iSCSI name.\n\nUse iqn.yyyy-mm.reversed.domain[:name] or eui.<16 hex digits>."
+    IDS_ERR_NO_DISKS        "Add at least one disk to the target."
+    IDS_FILTER_IMAGES       "Disk images (*.vhd;*.vmdk;*.img)|*.vhd;*.vmdk;*.img|All files (*.*)|*.*|"
+    IDS_FILTER_VHD          "Virtual hard disks (*.vhd)|*.vhd|"
+    IDS_ERR_NO_FILE         "Choose a file."
+    IDS_ERR_OPEN_IMAGE      "Cannot open the disk image {0}:\n{1}"
+    IDS_ERR_OPEN_DEVICE     "Cannot open {0}:\n{1}"
+    IDS_ERR_DYNAMIC_DISK    "{0} is a dynamic disk. Writing to it from an initiator would likely corrupt the dynamic disk database; add it read-only."
+    IDS_ERR_VOLUME_LOCKED   "Cannot lock the volume {0} for exclusive access ({1}). Close programs that use it, or add it read-only."
+    IDS_ERR_ALREADY_SERVED  "{0} is already being served."
+    IDS_ERR_WRITE_PROTECTED "{0} is write-protected; add it read-only."
+    IDS_HINT_ADMIN          "Run TISCSI as administrator to use physical disks and volumes."
+    IDS_ERR_INVALID_SIZE    "Enter a size between {0} and {1} MB."
+    IDS_ERR_CREATE          "Cannot create {0}:\n{1}"
+    IDS_ERR_RAM_ALLOC       "Not enough memory for a RAM disk of {0}."
+    IDS_COL_DISK            "Disk"
+    IDS_COL_SERIAL          "Serial number"
+    IDS_DYNAMIC_SUFFIX      " (dynamic disk)"
+    IDS_ERR_NO_SELECTION    "Select an item in the list."
+    IDS_CONFIRM_LOCK_DISK   "While the target exists, these volumes on disk {0} will be locked and dismounted:\n\n{1}\nContinue?"
+    IDS_COL_VOLUME          "Volume"
+    IDS_COL_LABEL           "Label"
+    IDS_COL_FILE_SYSTEM     "File system"
+    IDS_COL_TYPE            "Type"
+    IDS_TYPE_BASIC          "Basic"
+    IDS_TYPE_DYNAMIC        "Dynamic"
+    IDS_LAYOUT_SIMPLE       "Simple"
+    IDS_LAYOUT_SPANNED      "Spanned"
+    IDS_LAYOUT_STRIPED      "Striped"
+    IDS_LAYOUT_MIRRORED     "Mirrored"
+    IDS_LAYOUT_RAID5        "RAID-5"
+    IDS_HEALTH_FAILED_REDUNDANCY " (Failed Redundancy)"
+    IDS_HEALTH_FAILED       " (Failed)"
+    IDS_UNMOUNTED_VOLUME    "{0} in {1} (not mounted by Windows)"
+    IDS_DESC_DYNAMIC_VOLUME "Dynamic volume {0}"
+    IDS_ERR_NO_SUCH_VOLUME  "The dynamic volume {0} was not found. The disks may have changed; open this window again."
+    IDS_ERR_AMBIGUOUS_VOLUME "More than one dynamic volume is named {0}."
+    IDS_ERR_VOLUME_FAILED   "The dynamic volume {0} cannot be used: disks holding its data are missing."
+    IDS_ERR_DEGRADED_WRITE  "The dynamic volume {0} is missing a member disk. Writing to it would leave the members inconsistent; add it read-only."
+END

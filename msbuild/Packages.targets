@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Import in the ExtensionTargets group, after msbuild\Packages.props was imported.
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(YyThunksPackageDir)build\native\YY-Thunks.targets" Condition="Exists('$(YyThunksPackageDir)build\native\YY-Thunks.targets')" />
+
+  <Target Name="TISCSIEnsurePackages" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <_TISCSIRestoreHint>Restore NuGet packages first (Visual Studio does this automatically, or run: msbuild TISCSI.sln -t:restore -p:RestorePackagesConfig=true).</_TISCSIRestoreHint>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(VcLtlPackageDir)build\native\config\config.props')" Text="VC-LTL package is missing. $(_TISCSIRestoreHint)" />
+    <Error Condition="!Exists('$(YyThunksPackageDir)build\native\YY-Thunks.targets')" Text="YY-Thunks package is missing. $(_TISCSIRestoreHint)" />
+  </Target>
+</Project>

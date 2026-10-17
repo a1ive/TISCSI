@@ -1,0 +1,216 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 A1ive
+//
+// Korean (Korea). Missing entries fall back to en-US.
+
+#pragma code_page(65001)
+
+LANGUAGE LANG_KOREAN, SUBLANG_KOREAN
+
+IDR_MAINMENU MENU
+BEGIN
+    POPUP "파일(&F)"
+    BEGIN
+        MENUITEM "끝내기(&X)", IDM_FILE_EXIT
+    END
+    POPUP "보기(&V)"
+    BEGIN
+        POPUP "언어(&L)"
+        BEGIN
+            MENUITEM "자동(&A)", IDM_LANG_AUTO
+            MENUITEM SEPARATOR
+        END
+    END
+    POPUP "도움말(&H)"
+    BEGIN
+        MENUITEM "TISCSI 정보(&A)...", IDM_HELP_ABOUT
+    END
+END
+
+// Korean templates follow the Japanese layout and use Malgun Gothic
+// (installed with Vista and later; Gulim is optional on Windows 10 and later)
+// with the Hangul charset, which makes XP fall back to Gulim.
+
+IDD_MAIN DIALOGEX 0, 0, 340, 120
+STYLE DS_SETFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+CAPTION "TISCSI"
+FONT 9, "Malgun Gothic", 0, 0, 0x81
+BEGIN
+    LTEXT           "IP 주소(&I):", IDC_STATIC, 7, 9, 60, 9
+    COMBOBOX        IDC_ADDRESS, 68, 7, 82, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "TCP 포트(&P):", IDC_STATIC, 155, 9, 50, 9
+    EDITTEXT        IDC_PORT, 206, 7, 31, 13, ES_NUMBER | ES_AUTOHSCROLL
+    PUSHBUTTON      "시작(&S)", IDC_START, 243, 6, 90, 15
+    LTEXT           "대상(&T):", IDC_STATIC, 7, 30, 60, 9
+    CONTROL         "", IDC_TARGETS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 40, 230, 74
+    PUSHBUTTON      "대상 추가(&A)...", IDC_ADD_TARGET, 243, 40, 90, 15
+    PUSHBUTTON      "대상 제거(&R)", IDC_REMOVE_TARGET, 243, 58, 90, 15
+END
+
+IDD_ADD_TARGET DIALOGEX 0, 0, 360, 152
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "iSCSI 대상 추가"
+FONT 9, "Malgun Gothic", 0, 0, 0x81
+BEGIN
+    LTEXT           "대상 이름(&N):", IDC_STATIC, 7, 9, 66, 9
+    EDITTEXT        IDC_TARGET_NAME, 75, 7, 170, 13, ES_AUTOHSCROLL
+    LTEXT           "디스크(&D):", IDC_STATIC, 7, 27, 66, 9
+    CONTROL         "", IDC_DISKS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 75, 26, 170, 102
+    PUSHBUTTON      "가상 디스크 만들기(&V)...", IDC_CREATE_VHD, 251, 26, 102, 14
+    PUSHBUTTON      "RAM 디스크 만들기(&R)...", IDC_CREATE_RAMDISK, 251, 43, 102, 14
+    PUSHBUTTON      "이미지 추가(&I)...", IDC_ADD_IMAGE, 251, 60, 102, 14
+    PUSHBUTTON      "물리적 디스크 추가(&P)...", IDC_ADD_PHYSICAL, 251, 77, 102, 14
+    PUSHBUTTON      "볼륨 추가(&O)...", IDC_ADD_VOLUME, 251, 94, 102, 14
+    PUSHBUTTON      "제거(&M)", IDC_REMOVE_DISK, 251, 111, 102, 14
+    DEFPUSHBUTTON   "확인", IDOK, 246, 133, 50, 14
+    PUSHBUTTON      "취소", IDCANCEL, 303, 133, 50, 14
+END
+
+IDD_SELECT_IMAGE DIALOGEX 0, 0, 260, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "디스크 이미지 추가"
+FONT 9, "Malgun Gothic", 0, 0, 0x81
+BEGIN
+    LTEXT           "파일(&F):", IDC_STATIC, 7, 9, 50, 9
+    EDITTEXT        IDC_PATH, 58, 7, 140, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "찾아보기(&B)...", IDC_BROWSE, 203, 6, 50, 15
+    AUTOCHECKBOX    "읽기 전용(&R)", IDC_READ_ONLY, 58, 27, 120, 10
+    DEFPUSHBUTTON   "확인", IDOK, 146, 44, 50, 14
+    PUSHBUTTON      "취소", IDCANCEL, 203, 44, 50, 14
+END
+
+IDD_CREATE_VHD DIALOGEX 0, 0, 260, 96
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "가상 디스크 만들기"
+FONT 9, "Malgun Gothic", 0, 0, 0x81
+BEGIN
+    LTEXT           "파일(&F):", IDC_STATIC, 7, 9, 50, 9
+    EDITTEXT        IDC_PATH, 58, 7, 140, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "찾아보기(&B)...", IDC_BROWSE, 203, 6, 50, 15
+    LTEXT           "크기(&S):", IDC_STATIC, 7, 28, 50, 9
+    EDITTEXT        IDC_SIZE_MB, 58, 26, 60, 13, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 118, 26, 10, 13
+    LTEXT           "MB", IDC_STATIC, 123, 28, 20, 9
+    AUTOCHECKBOX    "동적 확장(&D)", IDC_DYNAMIC, 58, 45, 160, 10
+    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 61, 246, 9
+    DEFPUSHBUTTON   "확인", IDOK, 146, 76, 50, 14
+    PUSHBUTTON      "취소", IDCANCEL, 203, 76, 50, 14
+END
+
+IDD_CREATE_RAMDISK DIALOGEX 0, 0, 190, 50
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "RAM 디스크 만들기"
+FONT 9, "Malgun Gothic", 0, 0, 0x81
+BEGIN
+    LTEXT           "크기(&S):", IDC_STATIC, 7, 9, 50, 9
+    EDITTEXT        IDC_SIZE_MB, 58, 7, 60, 13, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 118, 7, 10, 13
+    LTEXT           "MB", IDC_STATIC, 123, 9, 20, 9
+    DEFPUSHBUTTON   "확인", IDOK, 76, 30, 50, 14
+    PUSHBUTTON      "취소", IDCANCEL, 133, 30, 50, 14
+END
+
+IDD_SELECT_PHYSICAL DIALOGEX 0, 0, 340, 150
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "물리적 디스크 추가"
+FONT 9, "Malgun Gothic", 0, 0, 0x81
+BEGIN
+    CONTROL         "", IDC_DEVICE_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 326, 116
+    AUTOCHECKBOX    "읽기 전용(&R)", IDC_READ_ONLY, 7, 132, 140, 10
+    DEFPUSHBUTTON   "확인", IDOK, 226, 130, 50, 14
+    PUSHBUTTON      "취소", IDCANCEL, 283, 130, 50, 14
+END
+
+IDD_SELECT_VOLUME DIALOGEX 0, 0, 410, 150
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "볼륨 추가"
+FONT 9, "Malgun Gothic", 0, 0, 0x81
+BEGIN
+    CONTROL         "", IDC_DEVICE_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 396, 116
+    AUTOCHECKBOX    "읽기 전용(&R)", IDC_READ_ONLY, 7, 132, 140, 10
+    DEFPUSHBUTTON   "확인", IDOK, 296, 130, 50, 14
+    PUSHBUTTON      "취소", IDCANCEL, 353, 130, 50, 14
+END
+
+IDD_ABOUT DIALOGEX 0, 0, 270, 124
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "TISCSI 정보"
+FONT 9, "Malgun Gothic", 0, 0, 0x81
+BEGIN
+    ICON            IDI_APP, IDC_STATIC, 10, 10, 20, 20
+    LTEXT           "TISCSI", IDC_STATIC, 42, 10, 218, 9
+    LTEXT           "", IDC_ABOUT_VERSION, 42, 22, 218, 9
+    LTEXT           "Copyright (C) 2026 A1ive", IDC_STATIC, 42, 34, 218, 9
+    LTEXT           "Tal Aloni의 iSCSI Console을 기반으로 합니다.", IDC_STATIC, 42, 46, 218, 9
+    LTEXT           "이 프로그램은 자유 소프트웨어이며 GNU 일반 공중 사용 허가서(GPL) 버전 3 또는 (선택에 따라) 그 이후 버전의 조건에 따라 배포됩니다.", IDC_STATIC, 42, 62, 218, 30
+    DEFPUSHBUTTON   "확인", IDOK, 210, 102, 50, 14
+END
+
+STRINGTABLE
+BEGIN
+    IDS_APP_TITLE           "TISCSI"
+    IDS_ABOUT_VERSION       "버전 {0}"
+    IDS_USAGE               "명령줄 옵션:\n\n/log\t프로그램 폴더에 로그 파일을 기록합니다\n--log=<파일>\t지정한 파일에 로그를 기록합니다\n--lang=<태그>\t표시 언어 (en-US, ja-JP, zh-CN, zh-TW, ko-KR)"
+    IDS_ERR_LOG_FILE        "로그 파일 {0}을(를) 열 수 없습니다:\n{1}"
+
+    IDS_ANY_ADDRESS         "모두"
+    IDS_START               "시작(&S)"
+    IDS_STOP                "중지(&S)"
+    IDS_COL_TARGET          "대상"
+    IDS_COL_LUNS            "LUN 수"
+    IDS_COL_SESSIONS        "세션 수"
+    IDS_STATUS_STOPPED      "서버가 중지되었습니다."
+    IDS_STATUS_RUNNING      "{0}:{1}에서 수신 대기 중 - 활성 세션 {2}개"
+    IDS_STATUS_NOT_ADMIN    "물리적 디스크와 볼륨은 관리자 권한이 필요하므로 사용할 수 없습니다."
+    IDS_ERR_INVALID_PORT    "TCP 포트에 1에서 65535 사이의 값을 입력하십시오."
+    IDS_ERR_START           "서버를 시작할 수 없습니다:\n{0}"
+    IDS_ERR_TARGET_EXISTS   "이름이 {0}인 대상이 이미 있습니다."
+    IDS_ERR_TARGET_IN_USE   "대상 {0}은(는) 사용 중이므로 제거할 수 없습니다."
+    IDS_CONFIRM_EXIT        "아직 연결된 이니시에이터가 있습니다. 서버를 중지하고 끝내시겠습니까?"
+
+    IDS_COL_DESCRIPTION     "설명"
+    IDS_COL_SIZE            "크기"
+    IDS_DESC_RAM_DISK       "RAM 디스크"
+    IDS_DESC_PHYSICAL_DISK  "물리적 디스크 {0}"
+    IDS_DESC_VOLUME         "볼륨 {0}"
+    IDS_READ_ONLY_SUFFIX    " (읽기 전용)"
+    IDS_ERR_INVALID_TARGET_NAME "대상 이름이 올바른 iSCSI 이름이 아닙니다.\n\niqn.yyyy-mm.역순도메인[:이름] 또는 eui.<16자리 16진수> 형식을 사용하십시오."
+    IDS_ERR_NO_DISKS        "대상에 디스크를 하나 이상 추가하십시오."
+    IDS_FILTER_IMAGES       "디스크 이미지 (*.vhd;*.vmdk;*.img)|*.vhd;*.vmdk;*.img|모든 파일 (*.*)|*.*|"
+    IDS_FILTER_VHD          "가상 하드 디스크 (*.vhd)|*.vhd|"
+    IDS_ERR_NO_FILE         "파일을 선택하십시오."
+    IDS_ERR_OPEN_IMAGE      "디스크 이미지 {0}을(를) 열 수 없습니다:\n{1}"
+    IDS_ERR_OPEN_DEVICE     "{0}을(를) 열 수 없습니다:\n{1}"
+    IDS_ERR_DYNAMIC_DISK    "{0}은(는) 동적 디스크입니다. 이니시에이터에서 쓰면 동적 디스크 데이터베이스가 손상될 수 있으므로 읽기 전용으로 추가하십시오."
+    IDS_ERR_VOLUME_LOCKED   "볼륨 {0}을(를) 단독으로 잠글 수 없습니다 ({1}). 사용 중인 프로그램을 닫거나 읽기 전용으로 추가하십시오."
+    IDS_ERR_ALREADY_SERVED  "{0}은(는) 이미 제공 중입니다."
+    IDS_ERR_WRITE_PROTECTED "{0}은(는) 쓰기 금지되어 있습니다. 읽기 전용으로 추가하십시오."
+    IDS_HINT_ADMIN          "물리적 디스크와 볼륨을 사용하려면 TISCSI를 관리자 권한으로 실행하십시오."
+    IDS_ERR_INVALID_SIZE    "{0}에서 {1} MB 사이의 크기를 입력하십시오."
+    IDS_ERR_CREATE          "{0}을(를) 만들 수 없습니다:\n{1}"
+    IDS_ERR_RAM_ALLOC       "{0} 크기의 RAM 디스크를 만들 메모리가 부족합니다."
+    IDS_COL_DISK            "디스크"
+    IDS_COL_SERIAL          "일련 번호"
+    IDS_DYNAMIC_SUFFIX      " (동적 디스크)"
+    IDS_ERR_NO_SELECTION    "목록에서 항목을 선택하십시오."
+    IDS_CONFIRM_LOCK_DISK   "대상이 있는 동안 디스크 {0}의 다음 볼륨이 잠기고 탑재 해제됩니다:\n\n{1}\n계속하시겠습니까?"
+    IDS_COL_VOLUME          "볼륨"
+    IDS_COL_LABEL           "레이블"
+    IDS_COL_FILE_SYSTEM     "파일 시스템"
+    IDS_COL_TYPE            "종류"
+    IDS_TYPE_BASIC          "기본"
+    IDS_TYPE_DYNAMIC        "동적"
+    IDS_LAYOUT_SIMPLE       "단순"
+    IDS_LAYOUT_SPANNED      "스팬"
+    IDS_LAYOUT_STRIPED      "스트라이프"
+    IDS_LAYOUT_MIRRORED     "미러"
+    IDS_LAYOUT_RAID5        "RAID-5"
+    IDS_HEALTH_FAILED_REDUNDANCY " (중복 실패)"
+    IDS_HEALTH_FAILED       " (실패)"
+    IDS_UNMOUNTED_VOLUME    "{1}의 {0} (Windows 미탑재)"
+    IDS_DESC_DYNAMIC_VOLUME "동적 볼륨 {0}"
+    IDS_ERR_NO_SUCH_VOLUME  "동적 볼륨 {0}을(를) 찾을 수 없습니다. 디스크 구성이 바뀌었을 수 있으니 이 창을 다시 여십시오."
+    IDS_ERR_AMBIGUOUS_VOLUME "이름이 {0}인 동적 볼륨이 여러 개 있습니다."
+    IDS_ERR_VOLUME_FAILED   "동적 볼륨 {0}을(를) 사용할 수 없습니다: 데이터가 있는 디스크가 없습니다."
+    IDS_ERR_DEGRADED_WRITE  "동적 볼륨 {0}에 구성원 디스크가 없습니다. 쓰면 구성원 사이의 일관성이 깨지므로 읽기 전용으로 추가하십시오."
+END

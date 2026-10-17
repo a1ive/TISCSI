@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+  Imported early by every project (before Microsoft.Cpp.Default.props).
+  Only global properties belong here; compiler/linker defaults live in msbuild\Common.props.
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <TISCSIRoot>$(MSBuildThisFileDirectory)</TISCSIRoot>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+
+    <!-- Drives both VC-LTL (msvcrt mode) and YY-Thunks (WinXP thunks, subsystem 5.01/5.02). -->
+    <WindowsTargetPlatformMinVersion Condition="'$(Platform)'=='Win32'">5.1.2600.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformMinVersion Condition="'$(Platform)'=='x64'">5.2.3790.0</WindowsTargetPlatformMinVersion>
+
+    <OutDir>$(TISCSIRoot)bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(TISCSIRoot)obj\$(Platform)\$(Configuration)\$(MSBuildProjectName)\</IntDir>
+  </PropertyGroup>
+</Project>

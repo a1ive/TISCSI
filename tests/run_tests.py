@@ -1,0 +1,1070 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 A1ive
+"""End-to-end tests: starts TISCSICli and talks to it with tests/initiator.py.
+
+usage: python tests/run_tests.py [--exe PATH] [--port N] [-k NAME]
+
+Exits with a non-zero status if any check fails. Windows only (uses
+Ctrl+Break to stop the server gracefully).
+"""
+import argparse
+import os
+import re
+import signal
+import socket
+import struct
+import subprocess
+import sys
+import tempfile
+import time
+import traceback
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ldm_tool  # noqa: E402
+import vhd_tool  # noqa: E402
+from initiator import Session, asc, cdb10, cdb16, sense_key  # noqa: E402
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HOST = "127.0.0.1"
+TARGET = "iqn.2026-10.test:disk"
+DEFAULT_TARGET = "iqn.1991-05.com.microsoft:target1"
+
+
+class Context:
+    def __init__(self, exe, port, workdir):
+        self.exe = exe
+        self.port = port
+        self.workdir = workdir
+        self.failures = 0
+        self.checks = 0
+
+    def check(self, condition, what):
+        self.checks += 1
+        print(("  PASS " if condition else "  FAIL ") + what)
+        if not condition:
+            self.failures += 1
+
+    def path(self, name):
+        return os.path.join(self.workdir, name)
+
+    def make_image(self, name, size, content=None):
+        path = self.path(name)
+        with open(path, "wb") as f:
+            if content:
+                f.write(content)
+            f.truncate(size)
+        return path
+
+    def session(self, isid=0x23D000000001):
+        return Session(HOST, self.port, isid=isid)
+
+
+class Server:
+    """TISCSICli child process, stopped with Ctrl+Break."""
+
+    def __init__(self, ctx, args, lang="en-US"):
+        self.ctx = ctx
+        command = [ctx.exe, "--listen", HOST, "--port", str(ctx.port), "--verbosity", "warning", "--lang", lang]
+        self.process = subprocess.Popen(command + args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+        self.output = ""
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if self.process.poll() is not None:
+                raise RuntimeError("server exited: " + self.process.stdout.read().decode("utf-8", "replace"))
+            try:
+                socket.create_connection((HOST, ctx.port), timeout=1).close()
+                return
+            except OSError:
+                time.sleep(0.1)
+        raise RuntimeError("server did not start listening")
+
+    def stop(self, timeout=20):
+        """Returns (stopped cleanly, seconds taken)."""
+        start = time.time()
+        os.kill(self.process.pid, signal.CTRL_BREAK_EVENT)
+        try:
+            out, _ = self.process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            out, _ = self.process.communicate()
+            self.output = out.decode("utf-8", "replace")
+            return False, time.time() - start
+        self.output = out.decode("utf-8", "replace")
+        return self.process.returncode == 0, time.time() - start
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        if self.process.poll() is None:
+            ok, _ = self.stop()
+            self.ctx.check(ok, "server stops cleanly")
+
+
+# ---------------------------------------------------------------------------
+
+def test_cli_errors(ctx):
+    def run(*args):
+        result = subprocess.run([ctx.exe, "--lang", "en-US", *args], capture_output=True, timeout=10)
+        return result.returncode, result.stderr.decode("utf-8", "replace") + result.stdout.decode("utf-8", "replace")
+
+    rc, out = run("--help")
+    ctx.check(rc == 0 and "Usage: TISCSICli" in out, "--help prints usage")
+    result = subprocess.run([ctx.exe, "--help", "--lang=ja-JP"], capture_output=True, timeout=10)
+    ctx.check(result.returncode == 0 and "使い方" in result.stdout.decode("utf-8", "replace"),
+              "--lang=ja-JP prints Japanese usage (UTF-8 when redirected)")
+    for tag, word in (("zh-CN", "用法"), ("zh-TW", "說明"), ("ko-KR", "사용법")):
+        result = subprocess.run([ctx.exe, "--help", "--lang", tag], capture_output=True, timeout=10)
+        ctx.check(result.returncode == 0 and word in result.stdout.decode("utf-8", "replace"),
+                  f"--lang {tag} prints localized usage")
+    result = subprocess.run([ctx.exe, "--lang", "zh-TW", "--ram", "12X"], capture_output=True, timeout=10)
+    ctx.check(result.returncode == 1 and "大小無效" in result.stderr.decode("utf-8", "replace"),
+              "errors are localized (zh-TW)")
+    rc, out = run("--bogus")
+    ctx.check(rc == 1 and "Unknown option: --bogus" in out, "unknown option is rejected")
+    rc, out = run("--ram", "12X")
+    ctx.check(rc == 1 and "Invalid size" in out, "invalid size is rejected")
+    rc, out = run("--target", "not-an-iqn", "--ram", "1M")
+    ctx.check(rc == 1 and "Invalid iSCSI target name" in out, "invalid target name is rejected")
+    rc, out = run("--target", TARGET)
+    ctx.check(rc == 1 and "has no disks" in out, "target without disks is rejected")
+    rc, out = run("--image", ctx.path("missing.img"))
+    ctx.check(rc == 2 and "Cannot open the disk image" in out, "missing image is reported")
+
+
+def test_protocol(ctx):
+    ram_size = 64 * 1024 * 1024
+    image = ctx.make_image("readonly.img", 32 * 1024 * 1024)
+    with Server(ctx, ["--target", TARGET, "--ram", "64M", "--image-ro", image]):
+        _protocol_checks(ctx, ram_size, os.path.getsize(image))
+
+
+def _protocol_checks(ctx, lun0_size, lun1_size):
+    # Discovery
+    s = ctx.session(isid=0x23D000000010)
+    status, tsih, _ = s.full_login(None, [("MaxRecvDataSegmentLength", "65536")])
+    ctx.check(status == 0 and tsih != 0, f"discovery login (TSIH={tsih})")
+    rbhs, resp = s.text([("SendTargets", "All")])
+    ctx.check(TARGET in resp.get("TargetName", []), "SendTargets lists the target")
+    ctx.check(struct.unpack(">I", rbhs[20:24])[0] == 0xFFFFFFFF, "final Text Response has the reserved TTT")
+    st, _, _, _ = s.scsi(bytes(6))
+    ctx.check(st == "reject", "SCSI command is rejected in a discovery session")
+    code, closed = s.logout()
+    ctx.check(code == 0 and closed, "discovery logout closes the connection")
+
+    # Unknown target
+    s = ctx.session(isid=0x23D000000011)
+    _, status, _, _ = s.login([("InitiatorName", s.initiator), ("TargetName", "iqn.2026-10.test:nope")], 1, 3)
+    ctx.check(status == 0x0203, "unknown target -> Not Found (0x0203)")
+    ctx.check(s.is_closed_by_target(), "connection is closed after a failed login")
+    s.close()
+
+    # Session A: InitialR2T=Yes, ImmediateData=No (pure R2T writes)
+    s = ctx.session(isid=0x23D000000001)
+    status, tsih, security_ok = s.full_login(TARGET, [
+        ("MaxRecvDataSegmentLength", "65536"), ("InitialR2T", "Yes"), ("ImmediateData", "No"),
+        ("MaxBurstLength", "65536"), ("FirstBurstLength", "65536"), ("MaxOutstandingR2T", "1"),
+        ("MaxConnections", "1"), ("DefaultTime2Wait", "2"), ("DefaultTime2Retain", "0")], security_stage=True)
+    ctx.check(security_ok, "security negotiation stage")
+    ctx.check(status == 0 and tsih != 0, f"normal login (TSIH={tsih})")
+    ctx.check(s.params.get("InitialR2T") == "Yes" and s.params.get("ImmediateData") == "No",
+              "negotiated InitialR2T=Yes, ImmediateData=No")
+    ctx.check(s.params.get("MaxBurstLength") == "65536", "negotiated MaxBurstLength=65536")
+
+    st, _, _, _ = s.scsi(bytes(6))
+    ctx.check(st == 0, "TEST UNIT READY")
+    st, data, _, _ = s.scsi(bytes([0x12, 0, 0, 0, 96, 0]), read_len=96)
+    ctx.check(st == 0 and data[8:14] == b"TISCSI" and data[16:27] == b"SCSI Disk 0", "standard INQUIRY")
+    ctx.check(b"\x09\x60" in data[58:74], "INQUIRY carries the iSCSI version descriptor")
+    st, data, _, _ = s.scsi(bytes([0x12, 1, 0x00, 0, 255, 0]), read_len=255)
+    ctx.check(st == 0 and list(data[4:4 + data[3]]) == [0x00, 0x80, 0x83], "VPD: supported pages")
+    st, data, _, _ = s.scsi(bytes([0x12, 1, 0x80, 0, 255, 0]), read_len=255)
+    ctx.check(st == 0 and len(data[4:]) == 8, "VPD: unit serial number")
+    st, data, _, _ = s.scsi(bytes([0x12, 1, 0x83, 0, 255, 0]), read_len=255)
+    ctx.check(st == 0 and TARGET.encode() in data and data[5] & 0x0F == 3, "VPD: device identification")
+    st, data, _, _ = s.scsi(bytes([0x12, 0, 0, 0, 36, 0]), read_len=36)
+    ctx.check(st == 0 and len(data) == 36, "INQUIRY is truncated to the allocation length")
+    st, data, _, _ = s.scsi(bytes([0xA0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]), read_len=256)
+    ctx.check(st == 0 and struct.unpack(">I", data[0:4])[0] == 16, "REPORT LUNS: 2 LUNs")
+    st, data, _, _ = s.scsi(bytes([0x25] + [0] * 9), read_len=8)
+    last, bs = struct.unpack(">II", data)
+    ctx.check(st == 0 and (last + 1) * bs == lun0_size and bs == 512, "READ CAPACITY (10)")
+    st, size, _ = s.capacity(lun=1)
+    ctx.check(st == 0 and size == lun1_size, "READ CAPACITY (16) on LUN 1")
+    st, data, _, _ = s.scsi(bytes([0x1A, 0, 0x3F, 0, 255, 0]), read_len=255)
+    ctx.check(st == 0 and data[0] + 1 == len(data) and data[3] == 8, "MODE SENSE (6), all pages")
+    st, data, _, _ = s.scsi(bytes([0x1A, 0, 0x08, 0, 255, 0]), lun=1, read_len=255)
+    ctx.check(st == 0 and data[2] & 0x80, "MODE SENSE (6) reports write protect on the read-only LUN")
+
+    pattern = os.urandom(256 * 1024)
+    lba = 100
+    st, _, r2ts, _ = s.scsi(cdb10(0x2A, lba, len(pattern) // 512), write_data=pattern)
+    ctx.check(st == 0 and r2ts == 4, f"WRITE (10) 256 KiB through R2Ts ({r2ts})")
+    st, data, _, _ = s.scsi(cdb10(0x28, lba, len(pattern) // 512), read_len=len(pattern))
+    ctx.check(st == 0 and data == pattern, "READ (10) 256 KiB matches (several Data-In PDUs)")
+    st, data, _, _ = s.scsi(bytes([0x08, 0, 0, lba, 0, 0]), read_len=256 * 512)
+    ctx.check(st == 0 and data == pattern[:256 * 512], "READ (6) with length 0 reads 256 blocks")
+    st, data, _, rb = s.scsi(bytes([0x08, 0, 0, lba, 1, 0]), read_len=4096)
+    ctx.check(st == 0 and len(data) == 512 and rb[1] & 0x02 and struct.unpack(">I", rb[44:48])[0] == 3584,
+              "residual underflow is reported")
+    st, data, _, _ = s.scsi(cdb16(0x88, lun0_size // 512, 1), read_len=512)
+    ctx.check(st == 2 and sense_key(data) == 5 and asc(data) == 0x21, "READ past the end -> LBA out of range")
+    st, data, _, _ = s.scsi(cdb10(0x2A, 0, 1), lun=1, write_data=bytes(512))
+    ctx.check(st == 2 and sense_key(data) == 7, "WRITE to the read-only LUN -> DATA PROTECT")
+    st, data, _, _ = s.scsi(bytes(6), lun=5)
+    ctx.check(st == 2 and sense_key(data) == 5 and asc(data) == 0x25, "command on a missing LUN -> invalid LUN")
+    st, data, _, _ = s.scsi(bytes([0xFF] + [0] * 5))
+    ctx.check(st == 2 and asc(data) == 0x20, "unknown SCSI opcode -> invalid command")
+    st, _, _, _ = s.scsi(bytes([0x35] + [0] * 9))
+    ctx.check(st == 0, "SYNCHRONIZE CACHE (10)")
+    rbhs, data, itt = s.nop(b"hello")
+    ctx.check(rbhs[0] & 0x3F == 0x20 and data == b"hello" and struct.unpack(">I", rbhs[16:20])[0] == itt,
+              "NOP-Out ping is echoed")
+    rbhs, data = s.raw_request(0x42, 0x81)  # task management: abort task
+    ctx.check(rbhs[0] & 0x3F == 0x3F and rbhs[2] == 0x05 and data[:1] == b"\x42", "task management is rejected")
+
+    itts = [s.send_command_only(cdb10(0x28, lba + i * 8, 8), 4096) for i in range(8)]
+    ok = True
+    for i, itt in enumerate(itts):
+        st, data, _, _ = s.collect(itt)
+        ok = ok and st == 0 and data == pattern[i * 4096:(i + 1) * 4096]
+    ctx.check(ok, "8 pipelined READs complete with the right data")
+    code, closed = s.logout()
+    ctx.check(code == 0 and closed, "logout closes the session")
+
+    # Session B: InitialR2T=No, ImmediateData=Yes (unsolicited data)
+    s = ctx.session(isid=0x23D000000002)
+    status, tsih, _ = s.full_login(TARGET, [
+        ("MaxRecvDataSegmentLength", "16384"), ("InitialR2T", "No"), ("ImmediateData", "Yes"),
+        ("MaxBurstLength", "262144"), ("FirstBurstLength", "65536"), ("MaxOutstandingR2T", "1")])
+    ctx.check(status == 0 and s.params.get("InitialR2T") == "No" and s.params.get("ImmediateData") == "Yes",
+              "login with InitialR2T=No, ImmediateData=Yes")
+    big = os.urandom(512 * 1024)
+    st, _, r2ts, _ = s.scsi(cdb10(0x2A, 4096, len(big) // 512), write_data=big)
+    ctx.check(st == 0 and r2ts >= 1, f"WRITE 512 KiB: immediate + unsolicited + R2T ({r2ts} R2Ts)")
+    small = os.urandom(4096)
+    st, _, r2ts, _ = s.scsi(cdb10(0x2A, 8192, 8), write_data=small)
+    ctx.check(st == 0 and r2ts == 0, "small WRITE entirely in immediate data")
+    st, data, _, _ = s.scsi(cdb10(0x28, 4096, len(big) // 512), read_len=len(big))
+    ctx.check(st == 0 and data == big, "READ back 512 KiB in 16 KiB Data-In PDUs")
+    st, data, _, _ = s.scsi(cdb10(0x28, 8192, 8), read_len=4096)
+    ctx.check(st == 0 and data == small, "READ back the small write")
+
+    # Session reinstatement
+    s2 = ctx.session(isid=0x23D000000002)
+    status, tsih2, _ = s2.full_login(TARGET, [("MaxRecvDataSegmentLength", "65536")])
+    ctx.check(status == 0 and tsih2 != tsih, "session reinstatement with the same ISID")
+    ctx.check(s.is_closed_by_target(), "the old session's connection is closed")
+    st, data, _, _ = s2.scsi(cdb10(0x28, 8192, 8), read_len=4096)
+    ctx.check(st == 0 and data == small, "data persists across sessions")
+    code, closed = s2.logout()
+    ctx.check(code == 0 and closed, "logout")
+
+
+def test_exclusive_image(ctx):
+    image = ctx.make_image("exclusive.img", 1024 * 1024)
+    with Server(ctx, ["--image", image]):
+        result = subprocess.run([ctx.exe, "--port", str(ctx.port + 1), "--image", image, "--lang", "en-US"],
+                                capture_output=True, timeout=10)
+        ctx.check(result.returncode == 2 and b"(32)" in result.stderr,
+                  "a read-write image cannot be opened by a second instance")
+
+
+def test_stop_with_sessions(ctx):
+    server = Server(ctx, ["--ram", "1M"])
+    s = ctx.session()
+    status, _, _ = s.full_login(DEFAULT_TARGET)
+    ctx.check(status == 0, "login to the default target name")
+    idle = socket.create_connection((HOST, ctx.port))  # connected, never logs in
+    time.sleep(0.3)
+    ok, seconds = server.stop()
+    ctx.check(ok and seconds < 5, f"server stops with live connections ({seconds:.2f}s)")
+    ctx.check(s.is_closed_by_target(), "logged-in connection is closed on stop")
+    s.close()
+    idle.close()
+
+
+# ---- Disk image formats ----------------------------------------------------
+
+IMAGE_SIZE = 16 * 1024 * 1024
+MiB = 1024 * 1024
+
+
+def find_tool(env, candidates):
+    path = os.environ.get(env)
+    if path:
+        return path if os.path.exists(path) else None
+    return next((c for c in candidates if os.path.exists(c)), None)
+
+
+QEMU_IMG = find_tool("TISCSI_QEMU_IMG", [r"C:\Program Files\qemu\qemu-img.exe"])
+VDISKMANAGER = find_tool("TISCSI_VDISKMANAGER", [
+    r"C:\Program Files\VMware\VMware Workstation\vmware-vdiskmanager.exe",
+    r"C:\Program Files (x86)\VMware\VMware Workstation\vmware-vdiskmanager.exe"])
+
+
+def reference_content():
+    """16 MiB with data at the start and in the middle, zeros elsewhere."""
+    data = bytearray(IMAGE_SIZE)
+    data[0:MiB] = os.urandom(MiB)
+    data[5 * MiB:5 * MiB + MiB // 2] = os.urandom(MiB // 2)
+    return bytes(data)
+
+
+def write_plan():
+    """Writes that hit allocated and unallocated blocks/grains, block
+    boundaries and the last sectors."""
+    return [
+        (64, os.urandom(64 * 1024)),
+        (int(1.75 * MiB) // 512, os.urandom(int(1.5 * MiB))),
+        (10 * MiB // 512, os.urandom(4096)),
+        (IMAGE_SIZE // 512 - 8, os.urandom(4096)),
+    ]
+
+
+def apply_writes(content, writes):
+    out = bytearray(content)
+    for lba, data in writes:
+        out[lba * 512:lba * 512 + len(data)] = data
+    return bytes(out)
+
+
+def run_tool(*args):
+    result = subprocess.run(list(args), capture_output=True, timeout=120)
+    return result.returncode, (result.stdout + result.stderr).decode("utf-8", "replace")
+
+
+def qemu_read(path, fmt):
+    raw = path + ".out.raw"
+    if os.path.exists(raw):
+        os.remove(raw)
+    rc, out = run_tool(QEMU_IMG, "convert", "-f", fmt, "-O", "raw", path, raw)
+    if rc != 0:
+        raise RuntimeError(out)
+    with open(raw, "rb") as f:
+        return f.read()
+
+
+def read_all(s, lun, size=IMAGE_SIZE):
+    data = bytearray()
+    for offset in range(0, size, MiB):
+        st, chunk, _, _ = s.read(offset // 512, min(MiB, size - offset) // 512, lun=lun)
+        if st != 0:
+            return None
+        data += chunk
+    return bytes(data)
+
+
+def serve_and_check(ctx, images, expected_before, writes):
+    """Serves `images` (list of (label, path)) read-write as LUNs of one
+    target; checks capacity and content, applies `writes`, reads back."""
+    args = ["--target", TARGET]
+    for _, path in images:
+        args += ["--image", path]
+    expected_after = apply_writes(expected_before, writes)
+    with Server(ctx, args):
+        s = ctx.session()
+        s.full_login(TARGET, [("MaxRecvDataSegmentLength", "262144")])
+        for lun, (label, _) in enumerate(images):
+            st, size, _ = s.capacity(lun)
+            ctx.check(st == 0 and size == IMAGE_SIZE, f"{label}: capacity {size}")
+            ctx.check(read_all(s, lun) == expected_before, f"{label}: content read over iSCSI")
+            ok = all(s.write(lba, data, lun=lun)[0] == 0 for lba, data in writes)
+            ctx.check(ok and read_all(s, lun) == expected_after, f"{label}: writes read back over iSCSI")
+        s.logout()
+    return expected_after
+
+
+def test_image_formats_qemu(ctx):
+    if not QEMU_IMG:
+        print("  SKIP qemu-img not found (set TISCSI_QEMU_IMG)")
+        return
+    ref = reference_content()
+    ref_path = ctx.path("ref.raw")
+    with open(ref_path, "wb") as f:
+        f.write(ref)
+    formats = [
+        ("VHD fixed (qemu)", "vpc", "subformat=fixed,force_size=on", "q-fixed.vhd"),
+        ("VHD dynamic (qemu)", "vpc", "subformat=dynamic,force_size=on", "q-dynamic.vhd"),
+        ("VMDK monolithicSparse (qemu)", "vmdk", "subformat=monolithicSparse", "q-msparse.vmdk"),
+        ("VMDK monolithicFlat (qemu)", "vmdk", "subformat=monolithicFlat", "q-mflat.vmdk"),
+        ("VMDK twoGbMaxExtentSparse (qemu)", "vmdk", "subformat=twoGbMaxExtentSparse", "q-2gsparse.vmdk"),
+        ("VMDK twoGbMaxExtentFlat (qemu)", "vmdk", "subformat=twoGbMaxExtentFlat", "q-2gflat.vmdk"),
+    ]
+    images = []
+    for label, fmt, options, name in formats:
+        rc, out = run_tool(QEMU_IMG, "convert", "-f", "raw", "-O", fmt, "-o", options, ref_path, ctx.path(name))
+        ctx.check(rc == 0, f"qemu-img creates {label}")
+        images.append((label, ctx.path(name)))
+
+    writes = write_plan()
+    expected = serve_and_check(ctx, images, ref, writes)
+    for (label, fmt, _, name) in formats:
+        ctx.check(qemu_read(ctx.path(name), fmt) == expected, f"{label}: qemu-img reads our writes back")
+        if fmt == "vmdk":
+            rc, out = run_tool(QEMU_IMG, "check", "-f", "vmdk", ctx.path(name))
+            ctx.check(rc == 0, f"{label}: qemu-img check reports no errors")
+
+    # VMDK delta disk on top of a sparse base
+    base = ctx.path("q-base.vmdk")
+    child = ctx.path("q-child.vmdk")
+    run_tool(QEMU_IMG, "convert", "-f", "raw", "-O", "vmdk", ref_path, base)
+    rc, out = run_tool(QEMU_IMG, "create", "-f", "vmdk", "-b", "q-base.vmdk", "-F", "vmdk", child)
+    ctx.check(rc == 0, "qemu-img creates a VMDK delta disk")
+    expected = serve_and_check(ctx, [("VMDK delta (qemu)", child)], ref, write_plan())
+    ctx.check(qemu_read(child, "vmdk") == expected, "VMDK delta: qemu-img reads child + parent")
+    ctx.check(qemu_read(base, "vmdk") == ref, "VMDK delta: parent is unchanged")
+
+    # Compressed streamOptimized images are not supported
+    stream = ctx.path("q-stream.vmdk")
+    run_tool(QEMU_IMG, "convert", "-f", "raw", "-O", "vmdk", "-o", "subformat=streamOptimized", ref_path, stream)
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), "--image-ro", stream)
+    ctx.check(rc == 2 and "not supported" in out, "streamOptimized VMDK is refused as unsupported")
+
+
+def test_create_vhd(ctx):
+    for kind, extra in (("fixed", []), ("dynamic", ["--dynamic"])):
+        path = ctx.path(f"new-{kind}.vhd")
+        rc, out = run_tool(ctx.exe, "--lang", "en-US", "--create-vhd", path, "--size", "16M", *extra)
+        ctx.check(rc == 0 and os.path.exists(path), f"--create-vhd creates a {kind} VHD")
+        footer = vhd_tool.read_footer(path)
+        ctx.check(footer["current_size"] == IMAGE_SIZE and footer["disk_type"] == (2 if kind == "fixed" else 3),
+                  f"{kind} VHD footer: size and type")
+        if kind == "dynamic":
+            ctx.check(os.path.getsize(path) < 64 * 1024, "dynamic VHD starts small")
+        expected = serve_and_check(ctx, [(f"created {kind} VHD", path)], bytes(IMAGE_SIZE), write_plan())
+        ctx.check(vhd_tool.read_disk(path) == expected, f"created {kind} VHD: spec reader sees our writes")
+        if QEMU_IMG:
+            rc, out = run_tool(QEMU_IMG, "info", "-f", "vpc", path)
+            ctx.check(rc == 0 and "virtual size: 16 MiB" in out, f"created {kind} VHD: qemu-img info")
+            ctx.check(qemu_read(path, "vpc") == expected, f"created {kind} VHD: qemu-img reads our writes")
+
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--create-vhd", ctx.path("new-fixed.vhd"), "--size", "16M")
+    ctx.check(rc == 2 and "Cannot create" in out, "--create-vhd refuses to overwrite a file")
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--create-vhd", ctx.path("x.vhd"), "--size", "1000")
+    ctx.check(rc == 1 and "Invalid VHD size" in out, "--size must be a multiple of 512")
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--create-vhd", ctx.path("x.vhd"))
+    ctx.check(rc == 1 and "requires --size" in out, "--create-vhd requires --size")
+
+
+def test_differencing_vhd(ctx):
+    if not QEMU_IMG:
+        print("  SKIP qemu-img not found (set TISCSI_QEMU_IMG)")
+        return
+    ref = reference_content()
+    ref_path = ctx.path("diff-ref.raw")
+    with open(ref_path, "wb") as f:
+        f.write(ref)
+    parent = ctx.path("parent.vhd")
+    run_tool(QEMU_IMG, "convert", "-f", "raw", "-O", "vpc", "-o", "subformat=dynamic,force_size=on", ref_path, parent)
+    child = ctx.path("child.vhd")
+    vhd_tool.create_differencing(child, parent)
+    expected = serve_and_check(ctx, [("differencing VHD", child)], ref, write_plan())
+    ctx.check(vhd_tool.read_disk(child) == expected, "differencing VHD: spec reader sees child + parent")
+    ctx.check(qemu_read(parent, "vpc") == ref, "differencing VHD: parent is unchanged")
+
+    wrong = ctx.path("wrong-id.vhd")
+    vhd_tool.create_differencing(wrong, parent, parent_id=bytes(16))
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), "--image-ro", wrong)
+    ctx.check(rc == 2 and "parent.vhd" in out, "differencing VHD with a mismatched parent ID is refused")
+    orphan = ctx.path("orphan.vhd")
+    vhd_tool.create_differencing(orphan, parent)
+    os.rename(parent, parent + ".moved")
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), "--image-ro", orphan)
+    ctx.check(rc == 2 and "parent.vhd" in out, "missing parent is reported with its path")
+    os.rename(parent + ".moved", parent)
+
+
+def test_image_formats_vmware(ctx):
+    if not VDISKMANAGER:
+        print("  SKIP vmware-vdiskmanager not found (set TISCSI_VDISKMANAGER)")
+        return
+    types = [
+        ("VMDK single growable (VMware)", 0, True),
+        ("VMDK split growable (VMware)", 1, True),
+        ("VMDK preallocated (VMware)", 2, False),
+        ("VMDK split preallocated (VMware)", 3, False),
+        ("VMDK preallocated ESX (VMware)", 4, False),
+        # type 6 (thin ESX) can only be created on a remote ESX host
+    ]
+    images = []
+    for label, disk_type, _ in types:
+        path = ctx.path(f"vmw-{disk_type}.vmdk")
+        rc, out = run_tool(VDISKMANAGER, "-q", "-c", "-s", "16MB", "-a", "lsilogic", "-t", str(disk_type), path)
+        ctx.check(rc == 0, f"vmware-vdiskmanager creates {label}")
+        images.append((label, path))
+    expected = serve_and_check(ctx, images, bytes(IMAGE_SIZE), write_plan())
+    for (label, disk_type, sparse), (_, path) in zip(types, images):
+        if sparse:
+            rc, out = run_tool(VDISKMANAGER, "-R", path)
+            ctx.check(rc == 0, f"{label}: vmware-vdiskmanager -R finds no inconsistencies")
+        flat = ctx.path(f"vmw-{disk_type}-conv.vmdk")
+        rc, out = run_tool(VDISKMANAGER, "-q", "-r", path, "-t", "2", flat)
+        converted = b""
+        if rc == 0:
+            with open(ctx.path(f"vmw-{disk_type}-conv-flat.vmdk"), "rb") as f:
+                converted = f.read()
+        ctx.check(converted == expected, f"{label}: VMware reads our writes back")
+
+    stream = ctx.path("vmw-5.vmdk")
+    run_tool(VDISKMANAGER, "-q", "-c", "-s", "16MB", "-a", "lsilogic", "-t", "5", stream)
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), "--image-ro", stream)
+    ctx.check(rc == 2 and "not supported" in out, "VMware streamOptimized VMDK is refused as unsupported")
+
+
+# ---- Physical disks, volumes, SCSI pass-through ------------------------------
+
+def is_elevated():
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
+def list_devices(ctx):
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--list")
+    return rc, out
+
+
+def find_listed_disk(listing, description):
+    """Disk number of the --list entry "  N: <description>", or None."""
+    import re
+    match = re.search(r"^  (\d+): " + re.escape(description) + r"(?: \(dynamic disk\))?$", listing, re.M)
+    return match.group(1) if match else None
+
+
+def find_listed_volume(listing, disk_index):
+    """Volume name of the first --list volume on disk `disk_index`, or None."""
+    import re
+    pattern = r"^  (\\\\\?\\Volume\{[^}]+\}\\)\r?\n[^\n]*on disk: " + re.escape(disk_index) + r"(?:,|$)"
+    match = re.search(pattern, listing, re.M)
+    return match.group(1) if match else None
+
+
+def test_devices_unprivileged(ctx):
+    rc, out = list_devices(ctx)
+    ctx.check(rc == 0 and "Physical disks:" in out and "Volumes:" in out and "SCSI devices:" in out,
+              "--list shows disks, volumes and SCSI devices")
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--disk", "abc")
+    ctx.check(rc == 1 and "Invalid disk number" in out, "--disk needs a number")
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--ram", "1M", "--spti", r"\\.\CdRom0")
+    ctx.check(rc == 1 and "--spti cannot be combined" in out, "--spti cannot be mixed with disks")
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--volume", "Q:\\no\\such\\mount\\")
+    ctx.check(rc == 2 and "Cannot open" in out, "unknown volume is reported")
+    if not is_elevated():
+        rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), "--disk", "0")
+        ctx.check(rc == 2 and "Access is denied" in out and "administrator" in out,
+                  "without administrator rights, --disk explains why it failed")
+
+
+def diskpart(ctx, name, commands):
+    script = ctx.path(name)
+    with open(script, "w", encoding="utf-8") as f:
+        f.write("\n".join(commands) + "\n")
+    result = subprocess.run(["diskpart", "/s", script], capture_output=True, timeout=120)
+    # diskpart writes in the console (OEM) code page.
+    return result.returncode, (result.stdout + result.stderr).decode("oem", "replace")
+
+
+VDS_E_NOT_SUPPORTED = 0x80042400
+
+
+def test_devices_elevated(ctx):
+    """Needs administrator rights: attaches a 64 MiB test VHD with diskpart and
+    serves it as a physical disk, a volume and through SCSI pass-through."""
+    if not is_elevated():
+        print("  SKIP not running as administrator")
+        return
+    vhd = ctx.path("device-test.vhd")
+    rc, out = diskpart(ctx, "attach.txt", [
+        f'create vdisk file="{vhd}" maximum=64 type=fixed',
+        f'select vdisk file="{vhd}"',
+        "attach vdisk",
+        "convert mbr",
+        "create partition primary",
+        "format fs=fat32 quick label=TISCSITEST",
+    ])
+    ctx.check(rc == 0, "diskpart creates and attaches a test VHD")
+    try:
+        time.sleep(2)
+        _, out = list_devices(ctx)
+        index = find_listed_disk(out, "Msft Virtual Disk, 64 MiB")
+        ctx.check(index is not None, "the test VHD shows up in --list")
+        if not index:
+            return
+        volume = find_listed_volume(out, index)
+        ctx.check(volume is not None, "its volume shows up in --list")
+        pattern = os.urandom(4096)
+
+        with Server(ctx, ["--target", TARGET, "--disk", index]):
+            s = ctx.session()
+            s.full_login(TARGET)
+            st, size, block = s.capacity()
+            ctx.check(st == 0 and size == 64 * MiB and block == 512, "--disk: capacity")
+            st, data, _, _ = s.read(0, 1)
+            ctx.check(st == 0 and data[510:512] == b"\x55\xaa", "--disk: reads the MBR")
+            st, _, _, _ = s.write(8, pattern)  # in the gap before the first partition
+            st2, data, _, _ = s.read(8, 8)
+            ctx.check(st == 0 and st2 == 0 and data == pattern, "--disk: write and read back (volume locked)")
+            s.logout()
+
+        if volume:
+            with Server(ctx, ["--target", TARGET, "--volume", volume]):
+                s = ctx.session()
+                s.full_login(TARGET)
+                st, data, _, _ = s.read(0, 1)
+                ctx.check(st == 0 and data[82:90] == b"FAT32   ", "--volume: sector 0 is the FAT32 boot sector")
+                st, size, _ = s.capacity()
+                last = size // 512 - 8
+                st, _, _, _ = s.write(last, pattern)
+                st2, data, _, _ = s.read(last, 8)
+                ctx.check(st == 0 and st2 == 0 and data == pattern, "--volume: write and read back (volume locked)")
+                s.logout()
+
+        with Server(ctx, ["--target", TARGET, "--disk-ro", index]):
+            s = ctx.session()
+            s.full_login(TARGET)
+            st, data, _, _ = s.read(8, 8)
+            ctx.check(st == 0 and data == pattern, "--disk-ro: earlier write persisted")
+            st, data, _, _ = s.write(8, bytes(4096))
+            ctx.check(st == 2 and sense_key(data) == 7, "--disk-ro: writes are refused")
+            s.logout()
+
+        try:
+            with Server(ctx, ["--target", TARGET, "--spti", rf"\\.\PhysicalDrive{index}"]):
+                s = ctx.session()
+                s.full_login(TARGET)
+                st, data, _, _ = s.scsi(bytes([0x12, 0, 0, 0, 96, 0]), read_len=96)
+                ctx.check(st == 0 and data[8:12] == b"Msft", "--spti: INQUIRY comes from the device")
+                st, data, _, _ = s.scsi(cdb10(0x28, 8, 8), read_len=4096)
+                ctx.check(st == 0 and data == pattern, "--spti: READ (10) through pass-through")
+                s.logout()
+        except RuntimeError as e:
+            ctx.check(False, f"--spti on the test disk: {e}")
+    finally:
+        diskpart(ctx, "detach.txt", [f'select vdisk file="{vhd}"', "detach vdisk"])
+
+
+# ---- Dynamic volumes (LDM) ---------------------------------------------------
+
+def read_volume(s, lun, size):
+    """Whole LUN in 1 MiB reads, or None on error."""
+    return read_all(s, lun, size)
+
+
+def ldm_args(paths):
+    args = []
+    for path in paths:
+        args += ["--ldm-disk", path]
+    return args
+
+
+def test_dynamic_volumes(ctx):
+    """Dynamic volumes assembled from images of LDM disks built by ldm_tool."""
+    paths = [ctx.path(f"ldm{i}.img") for i in range(3)]
+    group, contents = ldm_tool.build_test_group(paths)
+    ldm_tool.damage_primary_headers(group, paths)  # readers fall back to the secondary copies
+    volumes = {v.name: v for v in group.volumes}
+
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--list", *ldm_args(paths))
+    expected = [("Volume1", "simple"), ("Volume2", "spanned"), ("Volume3", "striped"), ("Volume4", "mirrored"),
+                ("Volume5", "RAID-5")]
+    ctx.check(rc == 0 and all(f"  {name}  {{{volumes[name].guid}}}" in out for name, _ in expected),
+              "--list --ldm-disk shows every volume (secondary PRIVHEAD / TOCBLOCK used)")
+    ctx.check(all(re.search(rf"{name}  .*\r?\n.*layout: {layout}; status: healthy", out) for name, layout in expected),
+              "--list shows layouts and health")
+    ctx.check("Not mounted by Windows" in out, "--list says image volumes are not mounted by Windows")
+
+    # Every layout read-only, by name and by GUID.
+    args = ["--target", TARGET] + ldm_args(paths)
+    for name, _ in expected:
+        args += ["--dynamic-volume-ro", name if name != "Volume3" else f"{{{volumes[name].guid}}}"]
+    with Server(ctx, args):
+        s = ctx.session()
+        s.full_login(TARGET, [("MaxRecvDataSegmentLength", "262144")])
+        for lun, (name, layout) in enumerate(expected):
+            size = len(contents[name])
+            st, capacity, _ = s.capacity(lun)
+            ctx.check(st == 0 and capacity == size, f"{name} ({layout}): capacity {capacity}")
+            ctx.check(read_volume(s, lun, size) == contents[name], f"{name} ({layout}): content")
+        st, data, _, _ = s.write(0, bytes(4096), lun=0)
+        ctx.check(st == 2 and sense_key(data) == 7, "--dynamic-volume-ro refuses writes")
+        s.logout()
+
+    # Degraded: without disk 1, the mirror reads its second plex and RAID-5
+    # rebuilds column 1 from the others; the spanned volume cannot be served.
+    present = [paths[0], paths[2]]
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--list", *ldm_args(present))
+    ctx.check(re.search(r"Volume4  .*\r?\n.*status: failed redundancy", out) is not None and
+              re.search(r"Volume2  .*\r?\n.*status: failed", out) is not None,
+              "--list shows failed redundancy and failed volumes")
+    with Server(ctx, ["--target", TARGET] + ldm_args(present) +
+                ["--dynamic-volume-ro", "Volume4", "--dynamic-volume-ro", "Volume5"]):
+        s = ctx.session()
+        s.full_login(TARGET, [("MaxRecvDataSegmentLength", "262144")])
+        ctx.check(read_volume(s, 0, len(contents["Volume4"])) == contents["Volume4"],
+                  "degraded mirror reads from the remaining plex")
+        ctx.check(read_volume(s, 1, len(contents["Volume5"])) == contents["Volume5"],
+                  "degraded RAID-5 rebuilds the missing column")
+        s.logout()
+    with Server(ctx, ["--target", TARGET] + ldm_args(paths[:2]) + ["--dynamic-volume-ro", "Volume5"]):
+        s = ctx.session()
+        s.full_login(TARGET, [("MaxRecvDataSegmentLength", "262144")])
+        ctx.check(read_volume(s, 0, len(contents["Volume5"])) == contents["Volume5"],
+                  "degraded RAID-5 rebuilds the last column")
+        s.logout()
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), *ldm_args(present),
+                       "--dynamic-volume-ro", "Volume2")
+    ctx.check(rc == 2 and "disks holding its data are missing" in out, "a volume with missing data is refused")
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), *ldm_args(present),
+                       "--dynamic-volume", "Volume5")
+    ctx.check(rc == 2 and "missing a member disk" in out, "read-write access to a degraded volume is refused")
+    rc, out = run_tool(ctx.exe, "--lang", "ja-JP", "--port", str(ctx.port), *ldm_args(present),
+                       "--dynamic-volume", "Volume5")
+    ctx.check(rc == 2 and "メンバー ディスクが欠けています" in out, "the refusal is localized")
+
+    # Read-write: writes across extents, stripes and parity rows.
+    writes = [(4000, os.urandom(300 * 512)),      # spanned: across the extent boundary at 4096
+              (100, os.urandom(70 * 1024)),        # partial stripes
+              (1000, os.urandom(1 * MiB + 1536)),  # many stripes
+              (0, os.urandom(512))]
+    rw_names = ["Volume2", "Volume3", "Volume4", "Volume5"]
+    args = ["--target", TARGET] + ldm_args(paths)
+    for name in rw_names:
+        args += ["--dynamic-volume", name]
+    expected_after = {name: apply_writes(contents[name], writes) for name in rw_names}
+    with Server(ctx, args) as server:
+        s = ctx.session()
+        s.full_login(TARGET, [("MaxRecvDataSegmentLength", "262144")])
+        for lun, name in enumerate(rw_names):
+            ok = all(s.write(lba, data, lun=lun)[0] == 0 for lba, data in writes)
+            ctx.check(ok and read_volume(s, lun, len(contents[name])) == expected_after[name],
+                      f"{name}: writes read back over iSCSI")
+        s.logout()
+        rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port + 1), *ldm_args(paths),
+                           "--dynamic-volume", "Volume1")
+        ctx.check(rc == 2 and "Cannot open" in out, "member images are opened exclusively for writing")
+    files = ldm_tool.open_files(paths)
+    try:
+        for name in rw_names:
+            volume = volumes[name]
+            plexes = [group.read_plex(files, plex, volume.sectors()) for plex in volume.plexes]
+            ctx.check(all(p == expected_after[name] for p in plexes), f"{name}: data on the member images")
+        ctx.check(group.parity_ok(files, volumes["Volume5"].plexes[0]), "Volume5: RAID-5 parity is consistent")
+    finally:
+        for f in files:
+            f.close()
+
+    # Lookup errors.
+    other = ctx.path("ldm-other.img")
+    other_group = ldm_tool.Group("OTHERDg0", [16384], gpt=[False])
+    other_group.volumes = [ldm_tool.Volume("Volume1", [ldm_tool.Plex("concat", [ldm_tool.Extent(0, 0, 4096)])])]
+    other_group.write_disks([other])
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), *ldm_args(paths + [other]),
+                       "--dynamic-volume-ro", "Volume1")
+    ctx.check(rc == 2 and "More than one dynamic volume" in out, "an ambiguous name is refused")
+    with Server(ctx, ["--target", TARGET] + ldm_args(paths + [other]) +
+                ["--dynamic-volume-ro", str(other_group.volumes[0].guid)]):
+        s = ctx.session()
+        s.full_login(TARGET)
+        st, capacity, _ = s.capacity(0)
+        ctx.check(st == 0 and capacity == 4096 * 512, "a GUID picks the volume of the second group")
+        s.logout()
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), *ldm_args(paths),
+                       "--dynamic-volume-ro", "Volume9")
+    ctx.check(rc == 2 and "No dynamic volume matches" in out, "an unknown volume is reported")
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--ldm-disk", paths[0], "--ram", "1M")
+    ctx.check(rc == 1 and "--ldm-disk can only be used" in out, "--ldm-disk without a dynamic volume is rejected")
+
+
+WINDOWS_VOLUME_PREFIX = "\\\\?\\Volume{"
+
+
+def test_dynamic_volumes_elevated(ctx):
+    """Needs administrator rights: builds dynamic volumes with diskpart on three
+    test VHDs and checks that TISCSI reads Windows' LDM database the way
+    Windows does (served through Windows while attached, assembled from the
+    VHD files after they are detached)."""
+    if not is_elevated():
+        print("  SKIP not running as administrator")
+        return
+    vhds = [ctx.path(f"ldm-test{i}.vhd") for i in range(3)]
+    commands = []
+    for vhd in vhds:
+        commands += [f'create vdisk file="{vhd}" maximum=64 type=fixed', f'select vdisk file="{vhd}"',
+                     "attach vdisk", "convert mbr"]
+    rc, out = diskpart(ctx, "ldm-attach.txt", commands)
+    converting = rc == 0
+    if converting:
+        commands = sum(([f'select vdisk file="{v}"', "convert dynamic"] for v in vhds), [])
+        rc, out = diskpart(ctx, "ldm-convert.txt", commands)
+    try:
+        if converting and rc == VDS_E_NOT_SUPPORTED:
+            # Recent Windows 11 builds refuse to make virtual disks dynamic.
+            print("  SKIP this Windows does not convert virtual disks to dynamic disks (VDS_E_NOT_SUPPORTED);"
+                  " run this test on Windows 7 / 10 or Windows Server")
+            return
+        ctx.check(rc == 0, "diskpart creates three dynamic test disks")
+        if rc != 0:
+            print(f"  diskpart exit code {rc:#x}, output:\n" + "\n".join("    " + line for line in out.splitlines()))
+            return  # the finally block detaches whatever was attached
+        time.sleep(2)
+        _, listing = list_devices(ctx)
+        indices = []
+        for match in re.finditer(r"^  (\d+): Msft Virtual Disk, 64 MiB \(dynamic disk\)$", listing, re.M):
+            indices.append(match.group(1))
+        ctx.check(len(indices) >= 3, "the dynamic test disks show up in --list")
+        if len(indices) < 3:
+            return
+        # The newest three virtual disks are ours.
+        a, b, c = indices[-3:]
+        layouts = [("simple", f"create volume simple size=8 disk={a}"),
+                   ("spanned", f"create volume simple size=4 disk={a}\nextend size=4 disk={b}"),
+                   ("striped", f"create volume stripe size=6 disk={a},{b},{c}"),
+                   ("mirrored", f"create volume mirror size=6 disk={b},{c}"),
+                   ("RAID-5", f"create volume raid size=6 disk={a},{b},{c}")]
+        created = []
+        for layout, command in layouts:
+            rc, out = diskpart(ctx, "ldm-volume.txt", command.split("\n"))
+            if rc == 0:
+                created.append(layout)
+            elif layout == "RAID-5":
+                print("  NOTE RAID-5 volumes need Windows Server; skipped")
+            else:
+                ctx.check(False, f"diskpart creates a {layout} volume: {out.strip()[-200:]}")
+        time.sleep(3)
+        _, listing = list_devices(ctx)
+        found = {}
+        ours = {a, b, c}
+        for match in re.finditer(r"^  (Volume\d+)  \{([0-9a-f-]+)\}[ \t]*\r?\n.*layout: ([^;]+); status: ([^;]+); "
+                                 r"size: [^;]+; on disk: ([^\r\n]*)\r?\n[ \t]*(.*)$", listing, re.M):
+            name, guid, layout, health, disks, mounted = match.groups()
+            # Only volumes on the test disks (the computer may have others).
+            if layout in created and layout not in found and set(disks.strip().split(", ")) <= ours:
+                found[layout] = (guid, health, mounted.strip())
+        ctx.check(sorted(found) == sorted(created), f"--list shows the new dynamic volumes ({', '.join(created)})")
+        ctx.check(all(m.startswith("Windows volume: \\\\?\\Volume{" + g + "}") for g, _, m in found.values()),
+                  "the LDM volume GUID is the Windows volume GUID")
+
+        # Write each volume in full through Windows (read-write uses the
+        # operating system's volume, which TISCSI locks).
+        contents = {}
+        for layout, (guid, _, _) in found.items():
+            with Server(ctx, ["--target", TARGET, "--dynamic-volume", guid]) as server:
+                s = ctx.session()
+                s.full_login(TARGET, [("MaxRecvDataSegmentLength", "262144")])
+                st, size, _ = s.capacity()
+                data = os.urandom(size)
+                ok = st == 0 and all(s.write(o // 512, data[o:o + MiB])[0] == 0 for o in range(0, size, MiB))
+                ctx.check(ok and read_volume(s, 0, size) == data, f"{layout}: written over iSCSI")
+                contents[layout] = data
+                s.logout()
+            ctx.check(WINDOWS_VOLUME_PREFIX + guid in server.output, f"{layout}: served through the Windows volume")
+
+        rc, out = diskpart(ctx, "ldm-detach.txt", sum(([f'select vdisk file="{v}"', "detach vdisk"] for v in vhds), []))
+        ctx.check(rc == 0, "diskpart detaches the test disks" + ("" if rc == 0 else ": " + out.strip()[-300:]))
+        time.sleep(2)
+
+        # Assembled by TISCSI from the VHD files: same data, then new writes.
+        writes = [(16, os.urandom(200 * 1024)), (3000, os.urandom(MiB))]
+        for layout, (guid, _, _) in found.items():
+            with Server(ctx, ["--target", TARGET] + ldm_args(vhds) + ["--dynamic-volume", guid]) as server:
+                s = ctx.session()
+                s.full_login(TARGET, [("MaxRecvDataSegmentLength", "262144")])
+                data = contents[layout]
+                ctx.check(read_volume(s, 0, len(data)) == data, f"{layout}: TISCSI assembles the data Windows wrote")
+                ok = all(s.write(lba, chunk)[0] == 0 for lba, chunk in writes)
+                ctx.check(ok, f"{layout}: written by TISCSI from the VHD files")
+                contents[layout] = apply_writes(data, writes)
+                s.logout()
+            ctx.check("{" + guid + "}" in server.output and WINDOWS_VOLUME_PREFIX not in server.output,
+                      f"{layout}: assembled by TISCSI")
+
+        commands = sum(([f'select vdisk file="{v}"', "attach vdisk"] for v in vhds), [])
+        rc, out = diskpart(ctx, "ldm-reattach.txt", commands)
+        ctx.check(rc == 0, "diskpart attaches the test disks again" + ("" if rc == 0 else ": " + out.strip()[-300:]))
+        time.sleep(5)
+        for layout, (guid, _, _) in found.items():
+            try:
+                with Server(ctx, ["--target", TARGET, "--dynamic-volume-ro", guid]) as server:
+                    s = ctx.session()
+                    s.full_login(TARGET, [("MaxRecvDataSegmentLength", "262144")])
+                    content_ok = read_volume(s, 0, len(contents[layout])) == contents[layout]
+                    s.logout()
+                # Windows normally mounts the volumes again; if it left the
+                # group offline, TISCSI assembled them from the physical disks.
+                route = "Windows" if WINDOWS_VOLUME_PREFIX + guid in server.output else "TISCSI (physical disks)"
+                ctx.check(content_ok, f"{layout}: after re-attaching, {route} reads what TISCSI wrote")
+            except RuntimeError as e:
+                ctx.check(False, f"{layout}: serving after re-attaching: {e}")
+    finally:
+        commands = []
+        for vhd in vhds:
+            commands += [f'select vdisk file="{vhd}"', "detach vdisk noerr"]
+        diskpart(ctx, "ldm-cleanup.txt", commands)
+
+
+# ---- Graphical front end ---------------------------------------------------
+
+class Gui:
+    """Drives TISCSI.exe through window messages (ctypes, no extra packages)."""
+
+    WM_SETTEXT, WM_GETTEXT, WM_GETTEXTLENGTH, WM_COMMAND, WM_CLOSE = 0x000C, 0x000D, 0x000E, 0x0111, 0x0010
+    # Control and command IDs from src/TISCSI/resource.h
+    IDOK, IDC_PORT, IDC_START, IDC_ADD_TARGET = 1, 1011, 1012, 1014
+    IDC_TARGET_NAME, IDC_CREATE_RAMDISK, IDC_SIZE_MB, IDM_LANG_FIRST = 1020, 1023, 1033, 40101
+
+    def __init__(self, exe, args):
+        import ctypes
+        from ctypes import wintypes
+        self.user32 = ctypes.WinDLL("user32", use_last_error=True)
+        self.user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        self.user32.SendMessageW.restype = wintypes.LPARAM
+        self.user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        self.user32.GetDlgItem.argtypes = [wintypes.HWND, ctypes.c_int]
+        self.user32.GetDlgItem.restype = wintypes.HWND
+        self.user32.FindWindowExW.argtypes = [wintypes.HWND, wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR]
+        self.user32.FindWindowExW.restype = wintypes.HWND
+        self.ctypes = ctypes
+        self.wintypes = wintypes
+        self.process = subprocess.Popen([exe] + args)
+        time.sleep(1.5)
+
+    def top_window(self):
+        """The process's visible, enabled top-level window (the active dialog)."""
+        ctypes, wintypes = self.ctypes, self.wintypes
+        found = []
+        proc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+        def callback(hwnd, _):
+            pid = wintypes.DWORD()
+            self.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            if pid.value == self.process.pid and self.user32.IsWindowVisible(hwnd) and \
+                    self.user32.IsWindowEnabled(hwnd):
+                found.append(hwnd)
+            return True
+
+        time.sleep(0.7)
+        self.user32.EnumWindows(proc(callback), 0)
+        return found[0] if found else None
+
+    def text(self, hwnd):
+        length = self.user32.SendMessageW(hwnd, self.WM_GETTEXTLENGTH, 0, 0)
+        buffer = self.ctypes.create_unicode_buffer(length + 1)
+        self.user32.SendMessageW(hwnd, self.WM_GETTEXT, length + 1, self.ctypes.addressof(buffer))
+        return buffer.value
+
+    def set_text(self, dialog, control, value):
+        buffer = self.ctypes.create_unicode_buffer(value)
+        self.user32.SendMessageW(self.user32.GetDlgItem(dialog, control), self.WM_SETTEXT, 0,
+                                 self.ctypes.addressof(buffer))
+
+    def command(self, window, command_id):
+        self.user32.PostMessageW(window, self.WM_COMMAND, command_id, 0)
+
+    def status_text(self, window):
+        status = self.user32.FindWindowExW(window, None, "msctls_statusbar32", None)
+        return self.text(status) if status else ""
+
+    def close(self):
+        if self.process.poll() is None:
+            self.process.kill()
+
+
+def test_gui(ctx):
+    gui_exe = os.path.join(os.path.dirname(ctx.exe), "TISCSI.exe")
+    if not os.path.exists(gui_exe):
+        print("  SKIP TISCSI.exe not found next to TISCSICli.exe")
+        return
+    ini = os.path.join(os.path.dirname(gui_exe), "TISCSI.ini")
+    saved_ini = open(ini, "rb").read() if os.path.exists(ini) else None
+    gui = Gui(gui_exe, ["--lang=en-US"])
+    try:
+        main = gui.top_window()
+        ctx.check(main is not None and gui.text(main) == "TISCSI", "main window opens")
+        gui.set_text(main, Gui.IDC_PORT, str(ctx.port))
+        gui.command(main, Gui.IDC_ADD_TARGET)
+        add = gui.top_window()
+        ctx.check(add is not None and add != main, "Add Target dialog opens")
+        gui.set_text(add, Gui.IDC_TARGET_NAME, TARGET)
+        gui.command(add, Gui.IDC_CREATE_RAMDISK)
+        ram = gui.top_window()
+        gui.set_text(ram, Gui.IDC_SIZE_MB, "64")
+        gui.command(ram, Gui.IDOK)
+        time.sleep(0.5)
+        gui.command(add, Gui.IDOK)
+        time.sleep(0.5)
+        gui.command(main, Gui.IDC_START)
+        time.sleep(1.0)
+        ctx.check(f":{ctx.port} - 0 active session(s)" in gui.status_text(main), "status bar: listening")
+
+        s = ctx.session()
+        status, _, _ = s.full_login(TARGET)
+        st, size, _ = s.capacity()
+        ctx.check(status == 0 and size == 64 * MiB, "initiator logs in to the target added in the GUI")
+        time.sleep(0.8)
+        ctx.check("1 active session(s)" in gui.status_text(main), "status bar counts the session")
+        data = os.urandom(4096)
+        ctx.check(s.write(0, data)[0] == 0 and s.read(0, 8)[1] == data, "RAM disk from the GUI reads and writes")
+        s.logout()
+        time.sleep(0.8)
+        ctx.check("0 active session(s)" in gui.status_text(main), "status bar: session ended")
+
+        gui.command(main, Gui.IDM_LANG_FIRST + 1)  # View > Language > 日本語
+        japanese = gui.top_window()
+        ctx.check(japanese is not None and "待ち受け中" in gui.status_text(japanese),
+                  "switching to Japanese rebuilds the window, server keeps running")
+        s = ctx.session()
+        status, _, _ = s.full_login(TARGET)
+        ctx.check(status == 0, "target survives the language switch")
+        s.logout()
+        gui.user32.PostMessageW(japanese, Gui.WM_CLOSE, 0, 0)
+        try:
+            gui.process.wait(timeout=10)
+            ctx.check(gui.process.returncode == 0, "the window closes and the process exits")
+        except subprocess.TimeoutExpired:
+            ctx.check(False, "the window closes and the process exits")
+    finally:
+        gui.close()
+        if saved_ini is None:
+            if os.path.exists(ini):
+                os.remove(ini)
+        else:
+            with open(ini, "wb") as f:
+                f.write(saved_ini)
+
+
+TESTS = [test_cli_errors, test_protocol, test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
+         test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_devices_unprivileged,
+         test_devices_elevated, test_dynamic_volumes, test_dynamic_volumes_elevated, test_gui]
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--exe", default=os.path.join(REPO, "bin", "x64", "Debug", "TISCSICli.exe"))
+    parser.add_argument("--port", type=int, default=3270)
+    parser.add_argument("-k", dest="filter", default="", help="only run tests whose name contains this")
+    args = parser.parse_args()
+    args.exe = os.path.abspath(args.exe)  # CreateProcess rejects relative paths with '/'
+    if not os.path.exists(args.exe):
+        sys.exit(f"{args.exe} not found; build the solution first or pass --exe")
+
+    with tempfile.TemporaryDirectory(prefix="tiscsi-tests-") as workdir:
+        ctx = Context(args.exe, args.port, workdir)
+        for test in TESTS:
+            if args.filter not in test.__name__:
+                continue
+            print(test.__name__)
+            try:
+                test(ctx)
+            except Exception:
+                ctx.failures += 1
+                traceback.print_exc()
+    print(f"\n{ctx.checks} checks, {ctx.failures} failure(s)")
+    sys.exit(1 if ctx.failures else 0)
+
+
+if __name__ == "__main__":
+    main()

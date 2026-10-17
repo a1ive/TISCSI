@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{87EC0A6E-BF5C-4057-AD9F-76FCA80274E0}</ProjectGuid>
+    <RootNamespace>Core</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <WholeProgramOptimization Condition="'$(Configuration)'=='Release'">true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(TISCSIRoot)msbuild\Packages.props" />
+    <Import Project="$(TISCSIRoot)msbuild\Common.props" />
+  </ImportGroup>
+  <ItemGroup>
+    <ClInclude Include="util\ByteOrder.h" />
+    <ClInclude Include="util\BlockingQueue.h" />
+    <ClInclude Include="util\CountdownLatch.h" />
+    <ClInclude Include="util\Log.h" />
+    <ClInclude Include="util\KeyValueText.h" />
+    <ClInclude Include="disk\Disk.h" />
+    <ClInclude Include="scsi\SptiTarget.h" />
+    <ClInclude Include="disk\DeviceDisk.h" />
+    <ClInclude Include="disk\Device.h" />
+    <ClInclude Include="disk\Vmdk.h" />
+    <ClInclude Include="disk\Vhd.h" />
+    <ClInclude Include="disk\DiskImage.h" />
+    <ClInclude Include="disk\File.h" />
+    <ClInclude Include="disk\RawDiskImage.h" />
+    <ClInclude Include="disk\RamDisk.h" />
+    <ClInclude Include="ldm\LdmDatabase.h" />
+    <ClInclude Include="ldm\DiskGroup.h" />
+    <ClInclude Include="ldm\DynamicVolume.h" />
+    <ClInclude Include="ldm\DynamicVolumes.h" />
+    <ClInclude Include="scsi\Lun.h" />
+    <ClInclude Include="scsi\ScsiTypes.h" />
+    <ClInclude Include="scsi\Cdb.h" />
+    <ClInclude Include="scsi\ScsiData.h" />
+    <ClInclude Include="scsi\ScsiTarget.h" />
+    <ClInclude Include="scsi\VirtualScsiTarget.h" />
+    <ClInclude Include="iscsi\Pdu.h" />
+    <ClInclude Include="iscsi\Parameters.h" />
+    <ClInclude Include="iscsi\IscsiName.h" />
+    <ClInclude Include="iscsi\IscsiTarget.h" />
+    <ClInclude Include="iscsi\Session.h" />
+    <ClInclude Include="iscsi\Connection.h" />
+    <ClInclude Include="iscsi\IscsiServer.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="util\Log.cpp" />
+    <ClCompile Include="util\KeyValueText.cpp" />
+    <ClCompile Include="disk\RawDiskImage.cpp" />
+    <ClCompile Include="scsi\SptiTarget.cpp" />
+    <ClCompile Include="disk\DeviceDisk.cpp" />
+    <ClCompile Include="disk\Device.cpp" />
+    <ClCompile Include="disk\Vmdk.cpp" />
+    <ClCompile Include="disk\Vhd.cpp" />
+    <ClCompile Include="disk\DiskImage.cpp" />
+    <ClCompile Include="disk\File.cpp" />
+    <ClCompile Include="disk\RamDisk.cpp" />
+    <ClCompile Include="ldm\LdmDatabase.cpp" />
+    <ClCompile Include="ldm\DiskGroup.cpp" />
+    <ClCompile Include="ldm\DynamicVolume.cpp" />
+    <ClCompile Include="ldm\DynamicVolumes.cpp" />
+    <ClCompile Include="scsi\Cdb.cpp" />
+    <ClCompile Include="scsi\ScsiData.cpp" />
+    <ClCompile Include="scsi\ScsiTarget.cpp" />
+    <ClCompile Include="scsi\VirtualScsiTarget.cpp" />
+    <ClCompile Include="iscsi\Pdu.cpp" />
+    <ClCompile Include="iscsi\IscsiName.cpp" />
+    <ClCompile Include="iscsi\IscsiTarget.cpp" />
+    <ClCompile Include="iscsi\Session.cpp" />
+    <ClCompile Include="iscsi\Connection.cpp" />
+    <ClCompile Include="iscsi\IscsiServer.cpp" />
+    <ClCompile Include="iscsi\IscsiServerLogin.cpp" />
+    <ClCompile Include="iscsi\IscsiServerProcessing.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(TISCSIRoot)msbuild\Packages.targets" />
+  </ImportGroup>
+</Project>

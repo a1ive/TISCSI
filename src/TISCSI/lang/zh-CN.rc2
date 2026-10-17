@@ -1,0 +1,216 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 A1ive
+//
+// Chinese (Simplified, PRC). Missing entries fall back to en-US.
+
+#pragma code_page(65001)
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+IDR_MAINMENU MENU
+BEGIN
+    POPUP "文件(&F)"
+    BEGIN
+        MENUITEM "退出(&X)", IDM_FILE_EXIT
+    END
+    POPUP "查看(&V)"
+    BEGIN
+        POPUP "语言(&L)"
+        BEGIN
+            MENUITEM "自动(&A)", IDM_LANG_AUTO
+            MENUITEM SEPARATOR
+        END
+    END
+    POPUP "帮助(&H)"
+    BEGIN
+        MENUITEM "关于 TISCSI(&A)...", IDM_HELP_ABOUT
+    END
+END
+
+// Chinese templates follow the Japanese layout and use Microsoft YaHei
+// (installed with Vista and later) with the GB2312 charset, which makes XP
+// fall back to SimSun.
+
+IDD_MAIN DIALOGEX 0, 0, 340, 120
+STYLE DS_SETFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+CAPTION "TISCSI"
+FONT 9, "Microsoft YaHei", 0, 0, 0x86
+BEGIN
+    LTEXT           "IP 地址(&I):", IDC_STATIC, 7, 9, 60, 9
+    COMBOBOX        IDC_ADDRESS, 68, 7, 82, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "TCP 端口(&P):", IDC_STATIC, 155, 9, 50, 9
+    EDITTEXT        IDC_PORT, 206, 7, 31, 13, ES_NUMBER | ES_AUTOHSCROLL
+    PUSHBUTTON      "启动(&S)", IDC_START, 243, 6, 90, 15
+    LTEXT           "目标(&T):", IDC_STATIC, 7, 30, 60, 9
+    CONTROL         "", IDC_TARGETS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 40, 230, 74
+    PUSHBUTTON      "添加目标(&A)...", IDC_ADD_TARGET, 243, 40, 90, 15
+    PUSHBUTTON      "删除目标(&R)", IDC_REMOVE_TARGET, 243, 58, 90, 15
+END
+
+IDD_ADD_TARGET DIALOGEX 0, 0, 360, 152
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "添加 iSCSI 目标"
+FONT 9, "Microsoft YaHei", 0, 0, 0x86
+BEGIN
+    LTEXT           "目标名称(&N):", IDC_STATIC, 7, 9, 66, 9
+    EDITTEXT        IDC_TARGET_NAME, 75, 7, 170, 13, ES_AUTOHSCROLL
+    LTEXT           "磁盘(&D):", IDC_STATIC, 7, 27, 66, 9
+    CONTROL         "", IDC_DISKS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 75, 26, 170, 102
+    PUSHBUTTON      "创建虚拟磁盘(&V)...", IDC_CREATE_VHD, 251, 26, 102, 14
+    PUSHBUTTON      "创建内存盘(&R)...", IDC_CREATE_RAMDISK, 251, 43, 102, 14
+    PUSHBUTTON      "添加映像(&I)...", IDC_ADD_IMAGE, 251, 60, 102, 14
+    PUSHBUTTON      "添加物理磁盘(&P)...", IDC_ADD_PHYSICAL, 251, 77, 102, 14
+    PUSHBUTTON      "添加卷(&O)...", IDC_ADD_VOLUME, 251, 94, 102, 14
+    PUSHBUTTON      "删除(&M)", IDC_REMOVE_DISK, 251, 111, 102, 14
+    DEFPUSHBUTTON   "确定", IDOK, 246, 133, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 303, 133, 50, 14
+END
+
+IDD_SELECT_IMAGE DIALOGEX 0, 0, 260, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "添加磁盘映像"
+FONT 9, "Microsoft YaHei", 0, 0, 0x86
+BEGIN
+    LTEXT           "文件(&F):", IDC_STATIC, 7, 9, 50, 9
+    EDITTEXT        IDC_PATH, 58, 7, 140, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "浏览(&B)...", IDC_BROWSE, 203, 6, 50, 15
+    AUTOCHECKBOX    "只读(&R)", IDC_READ_ONLY, 58, 27, 120, 10
+    DEFPUSHBUTTON   "确定", IDOK, 146, 44, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 203, 44, 50, 14
+END
+
+IDD_CREATE_VHD DIALOGEX 0, 0, 260, 96
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "创建虚拟磁盘"
+FONT 9, "Microsoft YaHei", 0, 0, 0x86
+BEGIN
+    LTEXT           "文件(&F):", IDC_STATIC, 7, 9, 50, 9
+    EDITTEXT        IDC_PATH, 58, 7, 140, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "浏览(&B)...", IDC_BROWSE, 203, 6, 50, 15
+    LTEXT           "大小(&S):", IDC_STATIC, 7, 28, 50, 9
+    EDITTEXT        IDC_SIZE_MB, 58, 26, 60, 13, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 118, 26, 10, 13
+    LTEXT           "MB", IDC_STATIC, 123, 28, 20, 9
+    AUTOCHECKBOX    "动态扩展(&D)", IDC_DYNAMIC, 58, 45, 160, 10
+    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 61, 246, 9
+    DEFPUSHBUTTON   "确定", IDOK, 146, 76, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 203, 76, 50, 14
+END
+
+IDD_CREATE_RAMDISK DIALOGEX 0, 0, 190, 50
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "创建内存盘"
+FONT 9, "Microsoft YaHei", 0, 0, 0x86
+BEGIN
+    LTEXT           "大小(&S):", IDC_STATIC, 7, 9, 50, 9
+    EDITTEXT        IDC_SIZE_MB, 58, 7, 60, 13, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 118, 7, 10, 13
+    LTEXT           "MB", IDC_STATIC, 123, 9, 20, 9
+    DEFPUSHBUTTON   "确定", IDOK, 76, 30, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 133, 30, 50, 14
+END
+
+IDD_SELECT_PHYSICAL DIALOGEX 0, 0, 340, 150
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "添加物理磁盘"
+FONT 9, "Microsoft YaHei", 0, 0, 0x86
+BEGIN
+    CONTROL         "", IDC_DEVICE_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 326, 116
+    AUTOCHECKBOX    "只读(&R)", IDC_READ_ONLY, 7, 132, 140, 10
+    DEFPUSHBUTTON   "确定", IDOK, 226, 130, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 283, 130, 50, 14
+END
+
+IDD_SELECT_VOLUME DIALOGEX 0, 0, 410, 150
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "添加卷"
+FONT 9, "Microsoft YaHei", 0, 0, 0x86
+BEGIN
+    CONTROL         "", IDC_DEVICE_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 396, 116
+    AUTOCHECKBOX    "只读(&R)", IDC_READ_ONLY, 7, 132, 140, 10
+    DEFPUSHBUTTON   "确定", IDOK, 296, 130, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 353, 130, 50, 14
+END
+
+IDD_ABOUT DIALOGEX 0, 0, 270, 124
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "关于 TISCSI"
+FONT 9, "Microsoft YaHei", 0, 0, 0x86
+BEGIN
+    ICON            IDI_APP, IDC_STATIC, 10, 10, 20, 20
+    LTEXT           "TISCSI", IDC_STATIC, 42, 10, 218, 9
+    LTEXT           "", IDC_ABOUT_VERSION, 42, 22, 218, 9
+    LTEXT           "Copyright (C) 2026 A1ive", IDC_STATIC, 42, 34, 218, 9
+    LTEXT           "基于 Tal Aloni 的 iSCSI Console。", IDC_STATIC, 42, 46, 218, 9
+    LTEXT           "本程序是自由软件，依据 GNU 通用公共许可证 (GPL) 第 3 版或 (由您选择) 任何更新版本的条款分发。", IDC_STATIC, 42, 62, 218, 30
+    DEFPUSHBUTTON   "确定", IDOK, 210, 102, 50, 14
+END
+
+STRINGTABLE
+BEGIN
+    IDS_APP_TITLE           "TISCSI"
+    IDS_ABOUT_VERSION       "版本 {0}"
+    IDS_USAGE               "命令行选项:\n\n/log\t在程序所在文件夹中写入日志文件\n--log=<文件>\t将日志写入指定文件\n--lang=<标记>\t界面语言 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)"
+    IDS_ERR_LOG_FILE        "无法打开日志文件 {0}:\n{1}"
+
+    IDS_ANY_ADDRESS         "任意"
+    IDS_START               "启动(&S)"
+    IDS_STOP                "停止(&S)"
+    IDS_COL_TARGET          "目标"
+    IDS_COL_LUNS            "LUN 数"
+    IDS_COL_SESSIONS        "会话数"
+    IDS_STATUS_STOPPED      "服务器已停止。"
+    IDS_STATUS_RUNNING      "正在侦听 {0}:{1} - {2} 个活动会话"
+    IDS_STATUS_NOT_ADMIN    "物理磁盘和卷需要管理员权限，已禁用。"
+    IDS_ERR_INVALID_PORT    "请输入 1 到 65535 之间的 TCP 端口。"
+    IDS_ERR_START           "无法启动服务器:\n{0}"
+    IDS_ERR_TARGET_EXISTS   "已存在名为 {0} 的目标。"
+    IDS_ERR_TARGET_IN_USE   "目标 {0} 正在使用中，无法删除。"
+    IDS_CONFIRM_EXIT        "仍有发起程序处于连接状态。要停止服务器并退出吗?"
+
+    IDS_COL_DESCRIPTION     "说明"
+    IDS_COL_SIZE            "大小"
+    IDS_DESC_RAM_DISK       "内存盘"
+    IDS_DESC_PHYSICAL_DISK  "物理磁盘 {0}"
+    IDS_DESC_VOLUME         "卷 {0}"
+    IDS_READ_ONLY_SUFFIX    " (只读)"
+    IDS_ERR_INVALID_TARGET_NAME "目标名称不是有效的 iSCSI 名称。\n\n请使用 iqn.yyyy-mm.反写的域名[:名称] 或 eui.<16 位十六进制数>。"
+    IDS_ERR_NO_DISKS        "请至少向目标添加一个磁盘。"
+    IDS_FILTER_IMAGES       "磁盘映像 (*.vhd;*.vmdk;*.img)|*.vhd;*.vmdk;*.img|所有文件 (*.*)|*.*|"
+    IDS_FILTER_VHD          "虚拟硬盘 (*.vhd)|*.vhd|"
+    IDS_ERR_NO_FILE         "请选择一个文件。"
+    IDS_ERR_OPEN_IMAGE      "无法打开磁盘映像 {0}:\n{1}"
+    IDS_ERR_OPEN_DEVICE     "无法打开 {0}:\n{1}"
+    IDS_ERR_DYNAMIC_DISK    "{0} 是动态磁盘。从发起程序写入很可能会损坏动态磁盘数据库，请以只读方式添加。"
+    IDS_ERR_VOLUME_LOCKED   "无法以独占方式锁定卷 {0} ({1})。请关闭正在使用它的程序，或以只读方式添加。"
+    IDS_ERR_ALREADY_SERVED  "{0} 已在提供中。"
+    IDS_ERR_WRITE_PROTECTED "{0} 处于写保护状态，请以只读方式添加。"
+    IDS_HINT_ADMIN          "要使用物理磁盘和卷，请以管理员身份运行 TISCSI。"
+    IDS_ERR_INVALID_SIZE    "请输入 {0} 到 {1} MB 之间的大小。"
+    IDS_ERR_CREATE          "无法创建 {0}:\n{1}"
+    IDS_ERR_RAM_ALLOC       "内存不足，无法创建 {0} 的内存盘。"
+    IDS_COL_DISK            "磁盘"
+    IDS_COL_SERIAL          "序列号"
+    IDS_DYNAMIC_SUFFIX      " (动态磁盘)"
+    IDS_ERR_NO_SELECTION    "请在列表中选择一项。"
+    IDS_CONFIRM_LOCK_DISK   "在目标存在期间，磁盘 {0} 上的以下卷将被锁定并卸除:\n\n{1}\n要继续吗?"
+    IDS_COL_VOLUME          "卷"
+    IDS_COL_LABEL           "卷标"
+    IDS_COL_FILE_SYSTEM     "文件系统"
+    IDS_COL_TYPE            "类型"
+    IDS_TYPE_BASIC          "基本"
+    IDS_TYPE_DYNAMIC        "动态"
+    IDS_LAYOUT_SIMPLE       "简单"
+    IDS_LAYOUT_SPANNED      "跨区"
+    IDS_LAYOUT_STRIPED      "带区"
+    IDS_LAYOUT_MIRRORED     "镜像"
+    IDS_LAYOUT_RAID5        "RAID-5"
+    IDS_HEALTH_FAILED_REDUNDANCY " (失败的重复)"
+    IDS_HEALTH_FAILED       " (失败)"
+    IDS_UNMOUNTED_VOLUME    "{1} 中的 {0} (Windows 未装入)"
+    IDS_DESC_DYNAMIC_VOLUME "动态卷 {0}"
+    IDS_ERR_NO_SUCH_VOLUME  "找不到动态卷 {0}。磁盘可能已发生变化，请重新打开此窗口。"
+    IDS_ERR_AMBIGUOUS_VOLUME "有多个名为 {0} 的动态卷。"
+    IDS_ERR_VOLUME_FAILED   "无法使用动态卷 {0}: 存放其数据的磁盘缺失。"
+    IDS_ERR_DEGRADED_WRITE  "动态卷 {0} 缺少成员磁盘。写入会导致各成员不一致，请以只读方式添加。"
+END

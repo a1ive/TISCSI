@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-License-Identifier: GPL-3.0-or-later
+  NuGet (packages.config) dependencies. Import in the PropertySheets group, i.e.
+  after Microsoft.Cpp.props. Keep versions in sync with each project's packages.config.
+
+  VC-LTL.props only registers config.props through NuGetImportAfterCppProps,
+  which recent Microsoft.Cpp.props (VS 2026) no longer honors, so config.props
+  is imported directly here.
+-->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <VcLtlPackageDir>$(TISCSIRoot)packages\VC-LTL.5.3.1\</VcLtlPackageDir>
+    <YyThunksPackageDir>$(TISCSIRoot)packages\YY-Thunks.1.2.3\</YyThunksPackageDir>
+  </PropertyGroup>
+  <Import Project="$(VcLtlPackageDir)build\native\config\config.props" Condition="Exists('$(VcLtlPackageDir)build\native\config\config.props')" />
+</Project>

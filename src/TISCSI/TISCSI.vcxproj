@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <ProjectGuid>{40CC8E57-3A40-4C6A-A4CC-E164673A21A9}</ProjectGuid>
+    <RootNamespace>TISCSI</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <WholeProgramOptimization Condition="'$(Configuration)'=='Release'">true</WholeProgramOptimization>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(TISCSIRoot)msbuild\Packages.props" />
+    <Import Project="$(TISCSIRoot)msbuild\Common.props" />
+  </ImportGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <!-- The manifest is embedded by TISCSI.rc so XP gets an asm.v2 trustInfo block. -->
+      <GenerateManifest>false</GenerateManifest>
+      <AdditionalDependencies>comctl32.lib;comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="AddTargetDialog.h" />
+    <ClInclude Include="App.h" />
+    <ClInclude Include="AppSettings.h" />
+    <ClInclude Include="DiskDialogs.h" />
+    <ClInclude Include="MainDialog.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="UiUtil.h" />
+    <ClInclude Include="version.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AddTargetDialog.cpp" />
+    <ClCompile Include="App.cpp" />
+    <ClCompile Include="AppSettings.cpp" />
+    <ClCompile Include="DiskDialogs.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="MainDialog.cpp" />
+    <ClCompile Include="UiUtil.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="TISCSI.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="lang\en-US.rc2" />
+    <None Include="lang\ja-JP.rc2" />
+    <None Include="packages.config" />
+    <None Include="TISCSI.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\TISCSI.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.vcxproj">
+      <Project>{D14CCBD2-0C10-43F4-8B87-9978860A64BB}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Core\Core.vcxproj">
+      <Project>{87EC0A6E-BF5C-4057-AD9F-76FCA80274E0}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(TISCSIRoot)msbuild\Packages.targets" />
+  </ImportGroup>
+</Project>

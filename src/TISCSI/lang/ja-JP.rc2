@@ -1,0 +1,216 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 A1ive
+//
+// Japanese (Japan). Missing entries fall back to en-US.
+
+#pragma code_page(65001)
+
+LANGUAGE LANG_JAPANESE, SUBLANG_JAPANESE_JAPAN
+
+IDR_MAINMENU MENU
+BEGIN
+    POPUP "ファイル(&F)"
+    BEGIN
+        MENUITEM "終了(&X)", IDM_FILE_EXIT
+    END
+    POPUP "表示(&V)"
+    BEGIN
+        POPUP "言語(&L)"
+        BEGIN
+            MENUITEM "自動(&A)", IDM_LANG_AUTO
+            MENUITEM SEPARATOR
+        END
+    END
+    POPUP "ヘルプ(&H)"
+    BEGIN
+        MENUITEM "バージョン情報(&A)...", IDM_HELP_ABOUT
+    END
+END
+
+// Japanese templates are wider than the English ones and use MS UI Gothic
+// (the standard Japanese dialog font) with the Shift-JIS charset, so glyphs
+// come out right on non-Japanese systems with Japanese fonts installed.
+
+IDD_MAIN DIALOGEX 0, 0, 340, 120
+STYLE DS_SETFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+CAPTION "TISCSI"
+FONT 9, "MS UI Gothic", 0, 0, 0x80
+BEGIN
+    LTEXT           "IP アドレス(&I):", IDC_STATIC, 7, 9, 60, 9
+    COMBOBOX        IDC_ADDRESS, 68, 7, 82, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "TCP ポート(&P):", IDC_STATIC, 155, 9, 50, 9
+    EDITTEXT        IDC_PORT, 206, 7, 31, 13, ES_NUMBER | ES_AUTOHSCROLL
+    PUSHBUTTON      "開始(&S)", IDC_START, 243, 6, 90, 15
+    LTEXT           "ターゲット(&T):", IDC_STATIC, 7, 30, 60, 9
+    CONTROL         "", IDC_TARGETS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 40, 230, 74
+    PUSHBUTTON      "ターゲットの追加(&A)...", IDC_ADD_TARGET, 243, 40, 90, 15
+    PUSHBUTTON      "ターゲットの削除(&R)", IDC_REMOVE_TARGET, 243, 58, 90, 15
+END
+
+IDD_ADD_TARGET DIALOGEX 0, 0, 360, 152
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "iSCSI ターゲットの追加"
+FONT 9, "MS UI Gothic", 0, 0, 0x80
+BEGIN
+    LTEXT           "ターゲット名(&N):", IDC_STATIC, 7, 9, 66, 9
+    EDITTEXT        IDC_TARGET_NAME, 75, 7, 170, 13, ES_AUTOHSCROLL
+    LTEXT           "ディスク(&D):", IDC_STATIC, 7, 27, 66, 9
+    CONTROL         "", IDC_DISKS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 75, 26, 170, 102
+    PUSHBUTTON      "仮想ディスクの作成(&V)...", IDC_CREATE_VHD, 251, 26, 102, 14
+    PUSHBUTTON      "RAM ディスクの作成(&R)...", IDC_CREATE_RAMDISK, 251, 43, 102, 14
+    PUSHBUTTON      "イメージの追加(&I)...", IDC_ADD_IMAGE, 251, 60, 102, 14
+    PUSHBUTTON      "物理ディスクの追加(&P)...", IDC_ADD_PHYSICAL, 251, 77, 102, 14
+    PUSHBUTTON      "ボリュームの追加(&O)...", IDC_ADD_VOLUME, 251, 94, 102, 14
+    PUSHBUTTON      "削除(&M)", IDC_REMOVE_DISK, 251, 111, 102, 14
+    DEFPUSHBUTTON   "OK", IDOK, 246, 133, 50, 14
+    PUSHBUTTON      "キャンセル", IDCANCEL, 303, 133, 50, 14
+END
+
+IDD_SELECT_IMAGE DIALOGEX 0, 0, 260, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "ディスク イメージの追加"
+FONT 9, "MS UI Gothic", 0, 0, 0x80
+BEGIN
+    LTEXT           "ファイル(&F):", IDC_STATIC, 7, 9, 50, 9
+    EDITTEXT        IDC_PATH, 58, 7, 140, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "参照(&B)...", IDC_BROWSE, 203, 6, 50, 15
+    AUTOCHECKBOX    "読み取り専用(&R)", IDC_READ_ONLY, 58, 27, 120, 10
+    DEFPUSHBUTTON   "OK", IDOK, 146, 44, 50, 14
+    PUSHBUTTON      "キャンセル", IDCANCEL, 203, 44, 50, 14
+END
+
+IDD_CREATE_VHD DIALOGEX 0, 0, 260, 96
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "仮想ディスクの作成"
+FONT 9, "MS UI Gothic", 0, 0, 0x80
+BEGIN
+    LTEXT           "ファイル(&F):", IDC_STATIC, 7, 9, 50, 9
+    EDITTEXT        IDC_PATH, 58, 7, 140, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "参照(&B)...", IDC_BROWSE, 203, 6, 50, 15
+    LTEXT           "サイズ(&S):", IDC_STATIC, 7, 28, 50, 9
+    EDITTEXT        IDC_SIZE_MB, 58, 26, 60, 13, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 118, 26, 10, 13
+    LTEXT           "MB", IDC_STATIC, 123, 28, 20, 9
+    AUTOCHECKBOX    "容量可変(&D)", IDC_DYNAMIC, 58, 45, 160, 10
+    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 61, 246, 9
+    DEFPUSHBUTTON   "OK", IDOK, 146, 76, 50, 14
+    PUSHBUTTON      "キャンセル", IDCANCEL, 203, 76, 50, 14
+END
+
+IDD_CREATE_RAMDISK DIALOGEX 0, 0, 190, 50
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "RAM ディスクの作成"
+FONT 9, "MS UI Gothic", 0, 0, 0x80
+BEGIN
+    LTEXT           "サイズ(&S):", IDC_STATIC, 7, 9, 50, 9
+    EDITTEXT        IDC_SIZE_MB, 58, 7, 60, 13, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 118, 7, 10, 13
+    LTEXT           "MB", IDC_STATIC, 123, 9, 20, 9
+    DEFPUSHBUTTON   "OK", IDOK, 76, 30, 50, 14
+    PUSHBUTTON      "キャンセル", IDCANCEL, 133, 30, 50, 14
+END
+
+IDD_SELECT_PHYSICAL DIALOGEX 0, 0, 340, 150
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "物理ディスクの追加"
+FONT 9, "MS UI Gothic", 0, 0, 0x80
+BEGIN
+    CONTROL         "", IDC_DEVICE_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 326, 116
+    AUTOCHECKBOX    "読み取り専用(&R)", IDC_READ_ONLY, 7, 132, 140, 10
+    DEFPUSHBUTTON   "OK", IDOK, 226, 130, 50, 14
+    PUSHBUTTON      "キャンセル", IDCANCEL, 283, 130, 50, 14
+END
+
+IDD_SELECT_VOLUME DIALOGEX 0, 0, 410, 150
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "ボリュームの追加"
+FONT 9, "MS UI Gothic", 0, 0, 0x80
+BEGIN
+    CONTROL         "", IDC_DEVICE_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 396, 116
+    AUTOCHECKBOX    "読み取り専用(&R)", IDC_READ_ONLY, 7, 132, 140, 10
+    DEFPUSHBUTTON   "OK", IDOK, 296, 130, 50, 14
+    PUSHBUTTON      "キャンセル", IDCANCEL, 353, 130, 50, 14
+END
+
+IDD_ABOUT DIALOGEX 0, 0, 270, 124
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "TISCSI のバージョン情報"
+FONT 9, "MS UI Gothic", 0, 0, 0x80
+BEGIN
+    ICON            IDI_APP, IDC_STATIC, 10, 10, 20, 20
+    LTEXT           "TISCSI", IDC_STATIC, 42, 10, 218, 9
+    LTEXT           "", IDC_ABOUT_VERSION, 42, 22, 218, 9
+    LTEXT           "Copyright (C) 2026 A1ive", IDC_STATIC, 42, 34, 218, 9
+    LTEXT           "Tal Aloni 氏の iSCSI Console をベースにしています。", IDC_STATIC, 42, 46, 218, 9
+    LTEXT           "本プログラムはフリーソフトウェアです。GNU 一般公衆利用許諾書 (GPL) バージョン 3、またはそれ以降のバージョンの条件の下で配布されます。", IDC_STATIC, 42, 62, 218, 30
+    DEFPUSHBUTTON   "OK", IDOK, 210, 102, 50, 14
+END
+
+STRINGTABLE
+BEGIN
+    IDS_APP_TITLE           "TISCSI"
+    IDS_ABOUT_VERSION       "バージョン {0}"
+    IDS_USAGE               "コマンド ライン オプション:\n\n/log\tプログラムのフォルダーにログ ファイルを書き込みます\n--log=<ファイル>\t指定したファイルにログを書き込みます\n--lang=<タグ>\t表示言語 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)"
+    IDS_ERR_LOG_FILE        "ログ ファイル {0} を開けません:\n{1}"
+
+    IDS_ANY_ADDRESS         "すべて"
+    IDS_START               "開始(&S)"
+    IDS_STOP                "停止(&S)"
+    IDS_COL_TARGET          "ターゲット"
+    IDS_COL_LUNS            "LUN 数"
+    IDS_COL_SESSIONS        "セッション数"
+    IDS_STATUS_STOPPED      "サーバーは停止しています。"
+    IDS_STATUS_RUNNING      "{0}:{1} で待ち受け中 - アクティブなセッション: {2}"
+    IDS_STATUS_NOT_ADMIN    "物理ディスクとボリュームには管理者権限が必要なため、無効になっています。"
+    IDS_ERR_INVALID_PORT    "TCP ポートには 1 から 65535 までの値を入力してください。"
+    IDS_ERR_START           "サーバーを開始できません:\n{0}"
+    IDS_ERR_TARGET_EXISTS   "ターゲット {0} は既に存在します。"
+    IDS_ERR_TARGET_IN_USE   "ターゲット {0} は使用中のため削除できません。"
+    IDS_CONFIRM_EXIT        "まだイニシエーターが接続しています。サーバーを停止して終了しますか?"
+
+    IDS_COL_DESCRIPTION     "説明"
+    IDS_COL_SIZE            "サイズ"
+    IDS_DESC_RAM_DISK       "RAM ディスク"
+    IDS_DESC_PHYSICAL_DISK  "物理ディスク {0}"
+    IDS_DESC_VOLUME         "ボリューム {0}"
+    IDS_READ_ONLY_SUFFIX    " (読み取り専用)"
+    IDS_ERR_INVALID_TARGET_NAME "ターゲット名が有効な iSCSI 名ではありません。\n\niqn.yyyy-mm.逆順のドメイン名[:名前] または eui.<16 桁の 16 進数> の形式で入力してください。"
+    IDS_ERR_NO_DISKS        "ターゲットにディスクを 1 つ以上追加してください。"
+    IDS_FILTER_IMAGES       "ディスク イメージ (*.vhd;*.vmdk;*.img)|*.vhd;*.vmdk;*.img|すべてのファイル (*.*)|*.*|"
+    IDS_FILTER_VHD          "仮想ハード ディスク (*.vhd)|*.vhd|"
+    IDS_ERR_NO_FILE         "ファイルを指定してください。"
+    IDS_ERR_OPEN_IMAGE      "ディスク イメージ {0} を開けません:\n{1}"
+    IDS_ERR_OPEN_DEVICE     "{0} を開けません:\n{1}"
+    IDS_ERR_DYNAMIC_DISK    "{0} はダイナミック ディスクです。イニシエーターから書き込むとダイナミック ディスクのデータベースが壊れるおそれがあるため、読み取り専用で追加してください。"
+    IDS_ERR_VOLUME_LOCKED   "ボリューム {0} を排他的にロックできません ({1})。使用中のプログラムを閉じるか、読み取り専用で追加してください。"
+    IDS_ERR_ALREADY_SERVED  "{0} は既に提供されています。"
+    IDS_ERR_WRITE_PROTECTED "{0} は書き込み禁止です。読み取り専用で追加してください。"
+    IDS_HINT_ADMIN          "物理ディスクとボリュームを使うには、TISCSI を管理者として実行してください。"
+    IDS_ERR_INVALID_SIZE    "サイズには {0} から {1} MB までの値を入力してください。"
+    IDS_ERR_CREATE          "{0} を作成できません:\n{1}"
+    IDS_ERR_RAM_ALLOC       "{0} の RAM ディスクを確保するためのメモリが足りません。"
+    IDS_COL_DISK            "ディスク"
+    IDS_COL_SERIAL          "シリアル番号"
+    IDS_DYNAMIC_SUFFIX      " (ダイナミック ディスク)"
+    IDS_ERR_NO_SELECTION    "一覧から項目を選択してください。"
+    IDS_CONFIRM_LOCK_DISK   "ターゲットが存在する間、ディスク {0} 上の次のボリュームはロックされ、マウントが解除されます:\n\n{1}\n続行しますか?"
+    IDS_COL_VOLUME          "ボリューム"
+    IDS_COL_LABEL           "ラベル"
+    IDS_COL_FILE_SYSTEM     "ファイル システム"
+    IDS_COL_TYPE            "種類"
+    IDS_TYPE_BASIC          "ベーシック"
+    IDS_TYPE_DYNAMIC        "ダイナミック"
+    IDS_LAYOUT_SIMPLE       "シンプル"
+    IDS_LAYOUT_SPANNED      "スパン"
+    IDS_LAYOUT_STRIPED      "ストライプ"
+    IDS_LAYOUT_MIRRORED     "ミラー"
+    IDS_LAYOUT_RAID5        "RAID-5"
+    IDS_HEALTH_FAILED_REDUNDANCY " (冗長性なし)"
+    IDS_HEALTH_FAILED       " (エラー)"
+    IDS_UNMOUNTED_VOLUME    "{1} の {0} (Windows 未マウント)"
+    IDS_DESC_DYNAMIC_VOLUME "ダイナミック ボリューム {0}"
+    IDS_ERR_NO_SUCH_VOLUME  "ダイナミック ボリューム {0} が見つかりません。ディスク構成が変わった可能性があります。このウィンドウを開き直してください。"
+    IDS_ERR_AMBIGUOUS_VOLUME "{0} という名前のダイナミック ボリュームが複数あります。"
+    IDS_ERR_VOLUME_FAILED   "ダイナミック ボリューム {0} は使用できません: データを持つディスクが見つかりません。"
+    IDS_ERR_DEGRADED_WRITE  "ダイナミック ボリューム {0} はメンバー ディスクが欠けています。書き込むとメンバー間の整合性が失われるため、読み取り専用で追加してください。"
+END

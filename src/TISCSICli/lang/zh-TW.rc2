@@ -1,0 +1,121 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 A1ive
+//
+// Chinese (Traditional, Taiwan). Missing entries fall back to en-US.
+
+#pragma code_page(65001)
+
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL
+
+STRINGTABLE
+BEGIN
+    IDS_CLI_USAGE "用法: TISCSICli [選項] [--target <名稱>] <磁碟>... [--target <名稱> <磁碟>...]...\n\n\
+將磁碟映像與 RAM 磁碟提供給 iSCSI 啟動器。\n\n\
+磁碟 (依指定順序成為目前目標的下一個 LUN):\n\
+  --image <路徑>       磁碟映像，可讀寫 (.vhd、.vmdk；其他副檔名視為原始映像)\n\
+  --image-ro <路徑>    磁碟映像，唯讀\n\
+  --ram <大小>         新的 RAM 磁碟，例如 512M 或 2G\n\
+  --disk <編號>        實體磁碟，可讀寫 (會鎖定其上的磁碟區)\n\
+  --disk-ro <編號>     實體磁碟，唯讀\n\
+  --volume <磁碟區>    磁碟區 (E:、掛接點或 \\\\?\\Volume{...}\\)，可讀寫\n\
+  --volume-ro <磁碟區> 磁碟區，唯讀\n\
+  --dynamic-volume <ID>\n\
+                       動態磁碟區 (GUID、Volume1 之類的名稱或 E:)，可讀寫；\n\
+                       也可使用 Windows 未掛接的磁碟區\n\
+  --dynamic-volume-ro <ID>\n\
+                       動態磁碟區，唯讀\n\
+  --ldm-disk <映像>    從成員磁碟的這個映像 (而非實體磁碟) 尋找動態磁碟區\n\
+                       (每個成員磁碟各指定一次)\n\n\
+目標:\n\
+  --target <名稱>      開始新的目標，其後的磁碟都屬於它。\n\
+                       在任何 --target 之前指定的磁碟屬於\n\
+                       iqn.1991-05.com.microsoft:target1\n\
+  --spti <裝置>        將目標的 SCSI 命令傳遞給本機裝置\n\
+                       (\\\\.\\CdRom0、\\\\.\\Tape0、\\\\.\\Scsi2: 等)\n\
+  --list               列出實體磁碟、磁碟區、動態磁碟區與 SCSI 裝置\n\
+                       (磁碟、磁碟區與 --spti 需要系統管理員權限，\n\
+                       來自 --ldm-disk 的動態磁碟區除外)\n\n\
+建立 VHD (同時指定磁碟時，之後才會啟動伺服器):\n\
+  --create-vhd <路徑>  建立新的 VHD 檔案\n\
+  --size <大小>        新 VHD 的大小，例如 20G (最大 2040G)\n\
+  --dynamic            建立動態擴充的 VHD (預設: 固定大小)\n\n\
+伺服器:\n\
+  --listen <位址>      要接聽的 IPv4 位址 (預設: 所有介面)\n\
+  --port <連接埠>      TCP 連接埠 (預設: 3260)\n\
+  --log <檔案>         同時將記錄寫入檔案\n\
+  --verbosity <層級>   error、warning、info (預設)、verbose 或 debug\n\
+  --lang <標記>        介面語言: en-US、ja-JP、zh-CN、zh-TW 或 ko-KR\n\
+                       (預設: Windows 顯示語言)\n\
+  --help               顯示此說明\n\n\
+範例:\n\
+  TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
+  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n"
+    IDS_CLI_LISTENING "正在接聽 {0}:{1}"
+    IDS_CLI_TARGET "目標: {0}"
+    IDS_CLI_LUN "  LUN {0}: {1}，{2}{3}"
+    IDS_CLI_READ_ONLY " (唯讀)"
+    IDS_CLI_RAM_DISK "RAM 磁碟"
+    IDS_CLI_PRESS_CTRL_C "按 Ctrl+C 停止伺服器。"
+    IDS_CLI_STOPPING "正在停止伺服器..."
+    IDS_CLI_STOPPED "伺服器已停止。"
+    IDS_CLI_CREATING "正在建立 {0} ({1}，{2})..."
+    IDS_CLI_CREATED "已建立 {0}。"
+    IDS_CLI_VHD_FIXED "固定大小"
+    IDS_CLI_VHD_DYNAMIC "動態擴充"
+    IDS_CLI_PHYSICAL_DISK "實體磁碟 {0}"
+    IDS_CLI_VOLUME "磁碟區 {0}"
+    IDS_CLI_SPTI "  SCSI 傳遞至 {0} ({1} 個 LUN)"
+    IDS_CLI_HINT_ADMIN "使用實體磁碟、磁碟區與 SCSI 傳遞需要以系統管理員身分執行。"
+    IDS_CLI_LIST_DISKS "實體磁碟:"
+    IDS_CLI_LIST_DISK "  {0}: {1}，{2}{3}"
+    IDS_CLI_LIST_DYNAMIC " (動態磁碟)"
+    IDS_CLI_LIST_VOLUMES "磁碟區:"
+    IDS_CLI_LIST_VOLUME "  {0}\n    掛接點: {1}；檔案系統: {2}；標籤: {3}；大小: {4}；所在磁碟: {5}"
+    IDS_CLI_LIST_SCSI "SCSI 裝置:"
+    IDS_CLI_LIST_DYNAMIC_VOLUMES "動態磁碟區:"
+    IDS_CLI_LIST_DYNAMIC_VOLUME "  {0}  {1}\n    磁碟群組: {2}；配置: {3}；狀態: {4}；大小: {5}；所在磁碟: {6}\n    {7}"
+    IDS_CLI_LIST_WINDOWS_VOLUME "Windows 磁碟區: {0}"
+    IDS_CLI_LIST_NOT_MOUNTED "Windows 未掛接；直接從成員磁碟提供"
+    IDS_CLI_DYNAMIC_VOLUME "動態磁碟區 {0}"
+    IDS_CLI_LAYOUT_SIMPLE "簡單"
+    IDS_CLI_LAYOUT_SPANNED "跨距"
+    IDS_CLI_LAYOUT_STRIPED "等量"
+    IDS_CLI_LAYOUT_MIRRORED "鏡像"
+    IDS_CLI_LAYOUT_RAID5 "RAID-5"
+    IDS_CLI_HEALTH_HEALTHY "狀況良好"
+    IDS_CLI_HEALTH_FAILED_REDUNDANCY "容錯失敗"
+    IDS_CLI_HEALTH_FAILED "失敗"
+
+    IDS_CLI_ERR_UNKNOWN_OPTION "不明的選項: {0}"
+    IDS_CLI_ERR_MISSING_VALUE "選項 {0} 需要一個值。"
+    IDS_CLI_ERR_INVALID_SIZE "大小無效: {0}"
+    IDS_CLI_ERR_INVALID_PORT "連接埠無效: {0}"
+    IDS_CLI_ERR_INVALID_ADDRESS "IPv4 位址無效: {0}"
+    IDS_CLI_ERR_INVALID_LEVEL "記錄層級無效: {0}"
+    IDS_CLI_ERR_INVALID_TARGET_NAME "iSCSI 目標名稱無效: {0}"
+    IDS_CLI_ERR_DUPLICATE_TARGET "目標名稱重複: {0}"
+    IDS_CLI_ERR_NO_DISKS "未指定磁碟。請使用 --image、--image-ro 或 --ram。"
+    IDS_CLI_ERR_TARGET_WITHOUT_DISKS "目標 {0} 沒有磁碟。"
+    IDS_CLI_ERR_OPEN_IMAGE "無法開啟磁碟映像 {0}: {1}"
+    IDS_CLI_ERR_RAM_ALLOC "無法配置 {0} 的 RAM 磁碟。"
+    IDS_CLI_ERR_LOG_FILE "無法開啟記錄檔 {0}: {1}"
+    IDS_CLI_ERR_START "無法啟動伺服器: {0}"
+    IDS_CLI_ERR_HINT_HELP "執行 TISCSICli --help 以查看用法。"
+    IDS_CLI_ERR_VHD_SIZE "VHD 大小無效: {0} (必須是 512 位元組的倍數，最大 2040 GiB)"
+    IDS_CLI_ERR_CREATE_NEEDS_SIZE "--create-vhd 需要 --size。"
+    IDS_CLI_ERR_SIZE_WITHOUT_CREATE "--size 與 --dynamic 只能與 --create-vhd 一起使用。"
+    IDS_CLI_ERR_CREATE "無法建立 {0}: {1}"
+    IDS_CLI_ERR_INVALID_DISK "磁碟編號無效: {0} (請參閱 --list)"
+    IDS_CLI_ERR_SPTI_MIXED "目標 {0}: --spti 不能與磁碟或另一個 --spti 合併使用。"
+    IDS_CLI_ERR_OPEN_SPTI "無法開啟 SCSI 裝置 {0}: {1}"
+    IDS_CLI_ERR_DYNAMIC_DISK "{0} 是動態磁碟。從啟動器寫入很可能會損毀動態磁碟資料庫，請以唯讀方式提供 (--disk-ro)。"
+    IDS_CLI_ERR_VOLUME_LOCKED "無法以獨占方式鎖定磁碟區 {0} ({1})。請關閉正在使用它的程式，或以唯讀方式提供。"
+    IDS_CLI_ERR_ALREADY_SERVED "{0} 已在提供中。"
+    IDS_CLI_ERR_WRITE_PROTECTED "{0} 有防寫保護，請以唯讀方式提供。"
+    IDS_CLI_ERR_OPEN_DEVICE "無法開啟「{0}」: {1}"
+    IDS_CLI_ERR_NO_SUCH_VOLUME "沒有與「{0}」相符的動態磁碟區 (請參閱 --list)。"
+    IDS_CLI_ERR_AMBIGUOUS_VOLUME "有多個名為「{0}」的動態磁碟區，請使用其 GUID (請參閱 --list)。"
+    IDS_CLI_ERR_VOLUME_FAILED "無法使用動態磁碟區「{0}」: 存放其資料的磁碟遺失。"
+    IDS_CLI_ERR_DEGRADED_WRITE "動態磁碟區「{0}」缺少成員磁碟。寫入會使各成員不一致，請以唯讀方式提供 (--dynamic-volume-ro)。"
+    IDS_CLI_ERR_LDM_UNUSED "--ldm-disk 只能與 --dynamic-volume、--dynamic-volume-ro 或 --list 一起使用。"
+END

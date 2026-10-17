@@ -1,0 +1,122 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 A1ive
+//
+// English (United States). Reference and fallback language: every string
+// must be defined here. {0}, {1}, ... are std::format arguments.
+
+#pragma code_page(65001)
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+STRINGTABLE
+BEGIN
+    IDS_CLI_USAGE "Usage: TISCSICli [options] [--target <name>] <disk>... [--target <name> <disk>...]...\n\n\
+Serves disk images and RAM disks to iSCSI initiators.\n\n\
+Disks (each one becomes the next LUN of the current target):\n\
+  --image <path>       Disk image, read-write (.vhd, .vmdk; other extensions: raw)\n\
+  --image-ro <path>    Disk image, read-only\n\
+  --ram <size>         New RAM disk, e.g. 512M or 2G\n\
+  --disk <n>           Physical disk n, read-write (its volumes are locked)\n\
+  --disk-ro <n>        Physical disk n, read-only\n\
+  --volume <volume>    Volume (E:, mount point or \\\\?\\Volume{...}\\), read-write\n\
+  --volume-ro <volume> Volume, read-only\n\
+  --dynamic-volume <id>\n\
+                       Dynamic volume (GUID, name such as Volume1, or E:),\n\
+                       read-write; also volumes Windows has not mounted\n\
+  --dynamic-volume-ro <id>\n\
+                       Dynamic volume, read-only\n\
+  --ldm-disk <image>   Find dynamic volumes in this image of a member disk\n\
+                       instead of the physical disks (repeat for each member)\n\n\
+Targets:\n\
+  --target <name>      Start a new target; the following disks belong to it.\n\
+                       Disks given before any --target belong to\n\
+                       iqn.1991-05.com.microsoft:target1\n\
+  --spti <device>      Make the target pass SCSI commands through to a local\n\
+                       device (\\\\.\\CdRom0, \\\\.\\Tape0, \\\\.\\Scsi2:, ...)\n\
+  --list               List physical disks, volumes, dynamic volumes and SCSI\n\
+                       devices (disks, volumes and --spti need administrator\n\
+                       rights, unless dynamic volumes come from --ldm-disk)\n\n\
+Creating a VHD (the server starts afterwards only if disks are given):\n\
+  --create-vhd <path>  Create a new VHD file\n\
+  --size <size>        Size of the new VHD, e.g. 20G (at most 2040G)\n\
+  --dynamic            Dynamically expanding VHD (default: fixed size)\n\n\
+Server:\n\
+  --listen <address>   IPv4 address to listen on (default: all interfaces)\n\
+  --port <port>        TCP port (default: 3260)\n\
+  --log <file>         Also write the log to a file\n\
+  --verbosity <level>  error, warning, info (default), verbose or debug\n\
+  --lang <tag>         Language: en-US, ja-JP, zh-CN, zh-TW\n\
+                       or ko-KR (default: Windows language)\n\
+  --help               Show this help\n\n\
+Example:\n\
+  TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
+  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n"
+    IDS_CLI_LISTENING "Listening on {0}:{1}"
+    IDS_CLI_TARGET "Target: {0}"
+    IDS_CLI_LUN "  LUN {0}: {1}, {2}{3}"
+    IDS_CLI_READ_ONLY " (read-only)"
+    IDS_CLI_RAM_DISK "RAM disk"
+    IDS_CLI_PRESS_CTRL_C "Press Ctrl+C to stop the server."
+    IDS_CLI_STOPPING "Stopping the server..."
+    IDS_CLI_STOPPED "The server has stopped."
+    IDS_CLI_CREATING "Creating {0} ({1}, {2})..."
+    IDS_CLI_CREATED "Created {0}."
+    IDS_CLI_VHD_FIXED "fixed size"
+    IDS_CLI_VHD_DYNAMIC "dynamically expanding"
+    IDS_CLI_PHYSICAL_DISK "Physical disk {0}"
+    IDS_CLI_VOLUME "Volume {0}"
+    IDS_CLI_SPTI "  SCSI pass-through to {0} ({1} LUNs)"
+    IDS_CLI_HINT_ADMIN "Physical disks, volumes and SCSI pass-through require running as administrator."
+    IDS_CLI_LIST_DISKS "Physical disks:"
+    IDS_CLI_LIST_DISK "  {0}: {1}, {2}{3}"
+    IDS_CLI_LIST_DYNAMIC " (dynamic disk)"
+    IDS_CLI_LIST_VOLUMES "Volumes:"
+    IDS_CLI_LIST_VOLUME "  {0}\n    mounted at: {1}; file system: {2}; label: {3}; size: {4}; on disk: {5}"
+    IDS_CLI_LIST_SCSI "SCSI devices:"
+    IDS_CLI_LIST_DYNAMIC_VOLUMES "Dynamic volumes:"
+    IDS_CLI_LIST_DYNAMIC_VOLUME "  {0}  {1}\n    disk group: {2}; layout: {3}; status: {4}; size: {5}; on disk: {6}\n    {7}"
+    IDS_CLI_LIST_WINDOWS_VOLUME "Windows volume: {0}"
+    IDS_CLI_LIST_NOT_MOUNTED "Not mounted by Windows; served from the member disks"
+    IDS_CLI_DYNAMIC_VOLUME "Dynamic volume {0}"
+    IDS_CLI_LAYOUT_SIMPLE "simple"
+    IDS_CLI_LAYOUT_SPANNED "spanned"
+    IDS_CLI_LAYOUT_STRIPED "striped"
+    IDS_CLI_LAYOUT_MIRRORED "mirrored"
+    IDS_CLI_LAYOUT_RAID5 "RAID-5"
+    IDS_CLI_HEALTH_HEALTHY "healthy"
+    IDS_CLI_HEALTH_FAILED_REDUNDANCY "failed redundancy"
+    IDS_CLI_HEALTH_FAILED "failed"
+
+    IDS_CLI_ERR_UNKNOWN_OPTION "Unknown option: {0}"
+    IDS_CLI_ERR_MISSING_VALUE "Option {0} requires a value."
+    IDS_CLI_ERR_INVALID_SIZE "Invalid size: {0}"
+    IDS_CLI_ERR_INVALID_PORT "Invalid port: {0}"
+    IDS_CLI_ERR_INVALID_ADDRESS "Invalid IPv4 address: {0}"
+    IDS_CLI_ERR_INVALID_LEVEL "Invalid verbosity level: {0}"
+    IDS_CLI_ERR_INVALID_TARGET_NAME "Invalid iSCSI target name: {0}"
+    IDS_CLI_ERR_DUPLICATE_TARGET "The target name is used more than once: {0}"
+    IDS_CLI_ERR_NO_DISKS "No disks specified. Use --image, --image-ro or --ram."
+    IDS_CLI_ERR_TARGET_WITHOUT_DISKS "Target {0} has no disks."
+    IDS_CLI_ERR_OPEN_IMAGE "Cannot open the disk image {0}: {1}"
+    IDS_CLI_ERR_RAM_ALLOC "Cannot allocate a RAM disk of {0}."
+    IDS_CLI_ERR_LOG_FILE "Cannot open the log file {0}: {1}"
+    IDS_CLI_ERR_START "Cannot start the server: {0}"
+    IDS_CLI_ERR_HINT_HELP "Run TISCSICli --help for usage."
+    IDS_CLI_ERR_VHD_SIZE "Invalid VHD size: {0} (must be a multiple of 512 bytes, at most 2040 GiB)"
+    IDS_CLI_ERR_CREATE_NEEDS_SIZE "--create-vhd requires --size."
+    IDS_CLI_ERR_SIZE_WITHOUT_CREATE "--size and --dynamic can only be used with --create-vhd."
+    IDS_CLI_ERR_CREATE "Cannot create {0}: {1}"
+    IDS_CLI_ERR_INVALID_DISK "Invalid disk number: {0} (see --list)"
+    IDS_CLI_ERR_SPTI_MIXED "Target {0}: --spti cannot be combined with disks or another --spti."
+    IDS_CLI_ERR_OPEN_SPTI "Cannot open the SCSI device {0}: {1}"
+    IDS_CLI_ERR_DYNAMIC_DISK "{0} is a dynamic disk. Writing to it from an initiator would likely corrupt the dynamic disk database; serve it read-only (--disk-ro)."
+    IDS_CLI_ERR_VOLUME_LOCKED "Cannot lock the volume {0} for exclusive access ({1}). Close programs that use it, or serve it read-only."
+    IDS_CLI_ERR_ALREADY_SERVED "{0} is already being served."
+    IDS_CLI_ERR_WRITE_PROTECTED "{0} is write-protected; serve it read-only."
+    IDS_CLI_ERR_OPEN_DEVICE "Cannot open ""{0}"": {1}"
+    IDS_CLI_ERR_NO_SUCH_VOLUME "No dynamic volume matches ""{0}"" (see --list)."
+    IDS_CLI_ERR_AMBIGUOUS_VOLUME "More than one dynamic volume is named ""{0}""; use its GUID (see --list)."
+    IDS_CLI_ERR_VOLUME_FAILED "The dynamic volume ""{0}"" cannot be used: disks holding its data are missing."
+    IDS_CLI_ERR_DEGRADED_WRITE "The dynamic volume ""{0}"" is missing a member disk. Writing to it would leave the members inconsistent; serve it read-only (--dynamic-volume-ro)."
+    IDS_CLI_ERR_LDM_UNUSED "--ldm-disk can only be used with --dynamic-volume, --dynamic-volume-ro or --list."
+END
