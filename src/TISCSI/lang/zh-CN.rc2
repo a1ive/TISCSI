@@ -34,23 +34,23 @@ END
 // (installed with Vista and later) with the GB2312 charset, which makes XP
 // fall back to SimSun.
 
-IDD_MAIN DIALOGEX 0, 0, 340, 120
+IDD_MAIN DIALOGEX 0, 0, 390, 120
 STYLE DS_SETFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
 CAPTION "TISCSI"
 FONT 9, "Microsoft YaHei", 0, 0, 0x86
 BEGIN
     LTEXT           "IP 地址(&I):", IDC_STATIC, 7, 9, 60, 9
-    COMBOBOX        IDC_ADDRESS, 68, 7, 82, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "TCP 端口(&P):", IDC_STATIC, 155, 9, 50, 9
-    EDITTEXT        IDC_PORT, 206, 7, 31, 13, ES_NUMBER | ES_AUTOHSCROLL
-    PUSHBUTTON      "启动(&S)", IDC_START, 243, 6, 90, 15
+    COMBOBOX        IDC_ADDRESS, 68, 7, 132, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "TCP 端口(&P):", IDC_STATIC, 205, 9, 50, 9
+    EDITTEXT        IDC_PORT, 256, 7, 31, 13, ES_NUMBER | ES_AUTOHSCROLL
+    PUSHBUTTON      "启动(&S)", IDC_START, 293, 6, 90, 15
     LTEXT           "目标(&T):", IDC_STATIC, 7, 30, 60, 9
-    CONTROL         "", IDC_TARGETS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 40, 230, 74
-    PUSHBUTTON      "添加目标(&A)...", IDC_ADD_TARGET, 243, 40, 90, 15
-    PUSHBUTTON      "删除目标(&R)", IDC_REMOVE_TARGET, 243, 58, 90, 15
+    CONTROL         "", IDC_TARGETS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 40, 280, 74
+    PUSHBUTTON      "添加目标(&A)...", IDC_ADD_TARGET, 293, 40, 90, 15
+    PUSHBUTTON      "删除目标(&R)", IDC_REMOVE_TARGET, 293, 58, 90, 15
 END
 
-IDD_ADD_TARGET DIALOGEX 0, 0, 360, 152
+IDD_ADD_TARGET DIALOGEX 0, 0, 360, 170
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "添加 iSCSI 目标"
 FONT 9, "Microsoft YaHei", 0, 0, 0x86
@@ -65,8 +65,32 @@ BEGIN
     PUSHBUTTON      "添加物理磁盘(&P)...", IDC_ADD_PHYSICAL, 251, 77, 102, 14
     PUSHBUTTON      "添加卷(&O)...", IDC_ADD_VOLUME, 251, 94, 102, 14
     PUSHBUTTON      "删除(&M)", IDC_REMOVE_DISK, 251, 111, 102, 14
-    DEFPUSHBUTTON   "确定", IDOK, 246, 133, 50, 14
-    PUSHBUTTON      "取消", IDCANCEL, 303, 133, 50, 14
+    PUSHBUTTON      "访问控制(&A)...", IDC_ACCESS, 75, 133, 80, 14
+    LTEXT           "", IDC_ACCESS_SUMMARY, 160, 136, 193, 9, SS_NOPREFIX | SS_ENDELLIPSIS
+    DEFPUSHBUTTON   "确定", IDOK, 246, 151, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 303, 151, 50, 14
+END
+
+IDD_TARGET_ACCESS DIALOGEX 0, 0, 300, 238
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "访问控制"
+FONT 9, "Microsoft YaHei", 0, 0, 0x86
+BEGIN
+    LTEXT           "允许的发起程序(&A): 每行一个 iSCSI 名称。留空则允许任何发起程序。", IDC_STATIC, 7, 7, 286, 18
+    EDITTEXT        IDC_ALLOWED_INITIATORS, 7, 27, 286, 44, ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    GROUPBOX        "CHAP 身份验证", IDC_STATIC, 7, 77, 286, 49
+    LTEXT           "名称(&N):", IDC_STATIC, 15, 91, 66, 9
+    EDITTEXT        IDC_CHAP_USER, 83, 89, 202, 13, ES_AUTOHSCROLL
+    LTEXT           "机密(&S):", IDC_STATIC, 15, 108, 66, 9
+    EDITTEXT        IDC_CHAP_SECRET, 83, 106, 202, 13, ES_PASSWORD | ES_AUTOHSCROLL
+    GROUPBOX        "双向 CHAP (目标的名称和机密)", IDC_STATIC, 7, 132, 286, 49
+    LTEXT           "名称(&M):", IDC_STATIC, 15, 146, 66, 9
+    EDITTEXT        IDC_MUTUAL_USER, 83, 144, 202, 13, ES_AUTOHSCROLL
+    LTEXT           "机密(&E):", IDC_STATIC, 15, 163, 66, 9
+    EDITTEXT        IDC_MUTUAL_SECRET, 83, 161, 202, 13, ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "机密的长度为 12 到 255 个字符。CHAP 名称留空则接受任何名称；双向 CHAP 名称留空则发送目标名称。", IDC_STATIC, 7, 187, 286, 27
+    DEFPUSHBUTTON   "确定", IDOK, 186, 218, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 243, 218, 50, 14
 END
 
 IDD_SELECT_IMAGE DIALOGEX 0, 0, 260, 78
@@ -171,6 +195,7 @@ BEGIN
     IDS_ERR_TARGET_EXISTS   "已存在名为 {0} 的目标。"
     IDS_ERR_TARGET_IN_USE   "目标 {0} 正在使用中，无法删除。"
     IDS_CONFIRM_EXIT        "仍有发起程序处于连接状态。要停止服务器并退出吗?"
+    IDS_COL_ACCESS          "访问"
 
     IDS_COL_DESCRIPTION     "说明"
     IDS_COL_SIZE            "大小"
@@ -217,6 +242,15 @@ BEGIN
     IDS_ERR_AMBIGUOUS_VOLUME "有多个名为 {0} 的动态卷。"
     IDS_ERR_VOLUME_FAILED   "无法使用动态卷 {0}: 存放其数据的磁盘缺失。"
     IDS_ERR_DEGRADED_WRITE  "动态卷 {0} 缺少成员磁盘。写入会导致各成员不一致，请以只读方式添加。"
+    IDS_ACCESS_ANY          "不限"
+    IDS_ACCESS_INITIATORS   "发起程序列表"
+    IDS_ACCESS_CHAP         "CHAP"
+    IDS_ACCESS_MUTUAL_CHAP  "双向 CHAP"
+    IDS_ACCESS_BOTH         "{0} + {1}"
+    IDS_ERR_CHAP_SECRET_LENGTH "CHAP 机密的长度必须为 {0} 到 {1} 个字符。"
+    IDS_ERR_CHAP_NO_SECRET  "请输入 CHAP 机密。CHAP 名称和双向 CHAP 都需要机密。"
+    IDS_ERR_MUTUAL_NO_SECRET "请为双向 CHAP 名称输入双向 CHAP 机密。"
+    IDS_ERR_MUTUAL_SAME_SECRET "双向 CHAP 机密必须与 CHAP 机密不同。"
     IDS_FILTER_CONFIG       "TISCSI 配置文件 (*.conf)|*.conf|所有文件 (*.*)|*.*|"
     IDS_ERR_CONFIG_READ     "无法读取配置文件 {0}:\n{1}"
     IDS_ERR_CONFIG_LINE     "{0} 第 {1} 行:\n{2}"

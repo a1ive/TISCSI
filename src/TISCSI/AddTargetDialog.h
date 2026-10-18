@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 A1ive
 //
-// "Add iSCSI Target" (iSCSI Console's AddTargetForm): a target name and the
-// disks it serves.
+// "Add iSCSI Target" (iSCSI Console's AddTargetForm): a target name, the
+// disks it serves and who may log in to it.
 
 #pragma once
 
 #include "App.h"
 #include "Core/disk/Disk.h"
+#include "Core/iscsi/IscsiTarget.h"
 #include "DiskDialogs.h"
 
 #include <windows.h>
@@ -30,6 +31,7 @@ private:
     void OnInit();
     void AddDisk(DiskChoice choice);
     void RemoveDisk();
+    void EditAccess();
     bool Accept();
     void UpdateUi();
 
@@ -37,6 +39,7 @@ private:
     HWND m_dialog = nullptr;
     std::vector<std::unique_ptr<disk::Disk>> m_disks; // released if the dialog is cancelled
     std::vector<config::DiskSpec> m_specs;          // one per disk
+    iscsi::TargetAccess m_access;
 };
 
 } // namespace tiscsi

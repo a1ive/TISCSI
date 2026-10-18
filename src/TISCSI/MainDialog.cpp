@@ -3,6 +3,7 @@
 
 #include "MainDialog.h"
 
+#include "AccessDialog.h"
 #include "AddTargetDialog.h"
 #include "AppSettings.h"
 #include "ConfigFiles.h"
@@ -179,16 +180,12 @@ void MainDialog::OnInit()
     FillAddresses();
     SetDlgItemInt(m_dialog, IDC_PORT, m_app.port, FALSE);
     SendDlgItemMessageW(m_dialog, IDC_PORT, EM_LIMITTEXT, 5, 0);
-    ui::InitListView(m_dialog, IDC_TARGETS, {{IDS_COL_TARGET, 150}, {IDS_COL_LUNS, 28}, {IDS_COL_SESSIONS, 36}});
-    // Number columns as wide as their (translated) headers; the name gets the rest.
+    ui::InitListView(m_dialog, IDC_TARGETS,
+                     {{IDS_COL_TARGET, 150}, {IDS_COL_LUNS, 28}, {IDS_COL_SESSIONS, 36}, {IDS_COL_ACCESS, 50}});
+    // Number columns as wide as their (translated) headers.
     HWND list = GetDlgItem(m_dialog, IDC_TARGETS);
     ListView_SetColumnWidth(list, 1, LVSCW_AUTOSIZE_USEHEADER);
     ListView_SetColumnWidth(list, 2, LVSCW_AUTOSIZE_USEHEADER);
-    RECT listClient;
-    GetClientRect(list, &listClient);
-    const int nameWidth = listClient.right - ListView_GetColumnWidth(list, 1) - ListView_GetColumnWidth(list, 2) -
-                          GetSystemMetrics(SM_CXVSCROLL);
-    ListView_SetColumnWidth(list, 0, std::max(nameWidth, 60));
     m_app.SetNotifyWindow(m_dialog);
     RefreshTargets();
     if (!m_app.startupConfig.empty()) {
@@ -245,12 +242,32 @@ void MainDialog::RefreshTargets()
     for (const App::TargetEntry& entry : m_app.Targets()) {
         const std::string& name = entry.target->Name();
         ui::AddListRow(list, {text::Utf8ToWide(name), std::to_wstring(entry.lunCount),
-                              std::to_wstring(m_app.SessionCount(name))});
+                              std::to_wstring(m_app.SessionCount(name)), AccessSummary(entry.target->access)});
     }
     if (selected >= 0 && selected < ListView_GetItemCount(list)) {
         ListView_SetItemState(list, selected, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
     }
+    SizeTargetColumns();
     UpdateUi();
+}
+
+void MainDialog::SizeTargetColumns()
+{
+    // The access column fits its header and texts (cells and headers are
+    // drawn with a margin of about 6 pixels on each side); the name gets
+    // the rest.
+    HWND list = GetDlgItem(m_dialog, IDC_TARGETS);
+    int accessWidth = ListView_GetStringWidth(list, i18n::Str(IDS_COL_ACCESS).c_str());
+    for (const App::TargetEntry& entry : m_app.Targets()) {
+        accessWidth = std::max(accessWidth, ListView_GetStringWidth(list, AccessSummary(entry.target->access).c_str()));
+    }
+    accessWidth += 14;
+    RECT listClient;
+    GetClientRect(list, &listClient);
+    const int nameWidth = listClient.right - ListView_GetColumnWidth(list, 1) - ListView_GetColumnWidth(list, 2) -
+                          accessWidth - GetSystemMetrics(SM_CXVSCROLL);
+    ListView_SetColumnWidth(list, 0, std::max(nameWidth, 60));
+    ListView_SetColumnWidth(list, 3, accessWidth);
 }
 
 void MainDialog::UpdateUi()

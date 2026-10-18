@@ -3,6 +3,7 @@
 
 #include "AddTargetDialog.h"
 
+#include "AccessDialog.h"
 #include "Common/I18n.h"
 #include "Common/Text.h"
 #include "Core/disk/Device.h"
@@ -70,6 +71,9 @@ INT_PTR AddTargetDialog::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam)
         case IDC_REMOVE_DISK:
             RemoveDisk();
             return TRUE;
+        case IDC_ACCESS:
+            EditAccess();
+            return TRUE;
         case IDOK:
             if (Accept()) {
                 EndDialog(m_dialog, IDOK);
@@ -99,6 +103,7 @@ void AddTargetDialog::OnInit()
     const bool elevated = disk::IsProcessElevated();
     EnableWindow(GetDlgItem(m_dialog, IDC_ADD_PHYSICAL), elevated);
     EnableWindow(GetDlgItem(m_dialog, IDC_ADD_VOLUME), elevated);
+    SetDlgItemTextW(m_dialog, IDC_ACCESS_SUMMARY, AccessSummary(m_access).c_str());
     UpdateUi();
 }
 
@@ -126,6 +131,13 @@ void AddTargetDialog::RemoveDisk()
     UpdateUi();
 }
 
+void AddTargetDialog::EditAccess()
+{
+    if (EditTargetAccess(m_dialog, m_access)) {
+        SetDlgItemTextW(m_dialog, IDC_ACCESS_SUMMARY, AccessSummary(m_access).c_str());
+    }
+}
+
 bool AddTargetDialog::Accept()
 {
     const std::string name = text::WideToUtf8(ui::GetText(m_dialog, IDC_TARGET_NAME));
@@ -143,7 +155,8 @@ bool AddTargetDialog::Accept()
     }
     const size_t lunCount = m_disks.size();
     auto target = std::make_shared<iscsi::IscsiTarget>(name, std::move(m_disks), m_app.ScsiLogger());
-    if (!m_app.AddTarget(std::move(target), lunCount, config::TargetSpec{name, std::move(m_specs), {}})) {
+    target->access = m_access;
+    if (!m_app.AddTarget(std::move(target), lunCount, config::TargetSpec{name, std::move(m_specs), {}, m_access})) {
         ui::ShowError(m_dialog, i18n::Format(IDS_ERR_TARGET_EXISTS, text::Utf8ToWide(name)));
         return true; // the disks now belong to the discarded target; nothing left to edit
     }

@@ -32,6 +32,7 @@ private:
     void BuildMenu();
     void FillAddresses();
     void RefreshTargets();
+    void SizeTargetColumns();
     void UpdateUi();
     void StartOrStop();
     void AddTarget();

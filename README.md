@@ -46,6 +46,11 @@ adding it (set automatically for `.iso` files). Physical
 disks and volumes need TISCSI to run as administrator. Start with `/log` to
 write a log file next to the executable.
 
+**Access...** in the same dialog restricts who may log in to the target:
+allowed initiator names (one per line) and CHAP or mutual CHAP, as described
+under [Access control](#access-control). The target list shows each target's
+restrictions in its **Access** column.
+
 **File > Save Configuration As...** writes the targets and the listening
 address to a [configuration file](#configuration-files) that `TISCSICli
 --config` also reads; disks and volumes are saved by their stable names.

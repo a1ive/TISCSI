@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import iso_tool  # noqa: E402
 import ldm_tool  # noqa: E402
 import vhd_tool  # noqa: E402
-from initiator import Session, asc, cdb10, cdb16, sense_key  # noqa: E402
+from initiator import DEFAULT_INITIATOR, Session, asc, cdb10, cdb16, sense_key  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOST = "127.0.0.1"
@@ -1679,6 +1679,8 @@ class Gui:
     IDC_TARGET_NAME, IDC_CREATE_RAMDISK, IDC_SIZE_MB, IDM_LANG_FIRST = 1020, 1023, 1033, 40101
     IDC_ADD_IMAGE, IDC_PATH, IDC_READ_ONLY, IDC_OPTICAL = 1024, 1030, 1032, 1038
     IDCANCEL, IDM_FILE_OPEN_CONFIG, IDM_FILE_SAVE_CONFIG = 2, 40003, 40004
+    IDC_ACCESS, IDC_ACCESS_SUMMARY, IDC_ALLOWED_INITIATORS = 1028, 1029, 1040
+    IDC_CHAP_USER, IDC_CHAP_SECRET = 1041, 1042
     IDC_STATIC_TEXT = 0xFFFF  # message box text
     BM_GETCHECK, BM_CLICK = 0x00F0, 0x00F5
 
@@ -1832,6 +1834,56 @@ def test_gui(ctx):
         time.sleep(0.8)
         ctx.check("0 active session(s)" in gui.status_text(main), "status bar: session ended")
 
+        # A second target, restricted through Access Control.
+        chap_target = "iqn.2026-10.test:gui-chap"
+        gui.command(main, Gui.IDC_ADD_TARGET)
+        add = gui.top_window()
+        gui.set_text(add, Gui.IDC_TARGET_NAME, chap_target)
+        gui.command(add, Gui.IDC_CREATE_RAMDISK)
+        ram = gui.top_window()
+        gui.set_text(ram, Gui.IDC_SIZE_MB, "1")
+        gui.command(ram, Gui.IDOK)
+        time.sleep(0.5)
+        gui.command(add, Gui.IDC_ACCESS)
+        access = gui.top_window()
+        ctx.check(access not in (None, add), "Access Control dialog opens")
+        gui.set_text(access, Gui.IDC_ALLOWED_INITIATORS, f"  {DEFAULT_INITIATOR}\r\n\r\n")
+        gui.set_text(access, Gui.IDC_CHAP_USER, "gui-user")
+        gui.set_text(access, Gui.IDC_CHAP_SECRET, "too-short")
+        gui.command(access, Gui.IDOK)
+        box = gui.top_window()
+        message = gui.text(gui.user32.GetDlgItem(box, Gui.IDC_STATIC_TEXT)) if box not in (None, access) else ""
+        ctx.check("12 to 255 characters" in message, "Access Control refuses a short CHAP secret")
+        if box not in (None, access):
+            gui.command(box, Gui.IDCANCEL)
+        gui.set_text(access, Gui.IDC_ALLOWED_INITIATORS, "not-an-iqn")
+        gui.set_text(access, Gui.IDC_CHAP_SECRET, "gui-chap-secret")
+        gui.command(access, Gui.IDOK)
+        box = gui.top_window()
+        message = gui.text(gui.user32.GetDlgItem(box, Gui.IDC_STATIC_TEXT)) if box not in (None, access) else ""
+        ctx.check("Invalid iSCSI initiator name: not-an-iqn" in message, "Access Control refuses an invalid initiator name")
+        if box not in (None, access):
+            gui.command(box, Gui.IDCANCEL)
+        gui.set_text(access, Gui.IDC_ALLOWED_INITIATORS, f"  {DEFAULT_INITIATOR}\r\n\r\n")
+        gui.command(access, Gui.IDOK)
+        ctx.check(gui.top_window() == add and
+                  gui.text(gui.user32.GetDlgItem(add, Gui.IDC_ACCESS_SUMMARY)) == "Initiator list + CHAP",
+                  "Add Target shows the access settings")
+        gui.command(add, Gui.IDOK)
+        time.sleep(0.5)
+        s = ctx.session()
+        ctx.check(s.full_login(chap_target)[0] == 0x0201, "a target added with CHAP in the GUI needs CHAP")
+        s.close()
+        s = Session(HOST, ctx.port, initiator="iqn.2026-10.test:other-initiator")
+        ctx.check(s.chap_login(chap_target, "gui-user", "gui-chap-secret")[0] == 0x0202,
+                  "and refuses initiators that are not listed")
+        s.close()
+        s = ctx.session()
+        status, _ = s.chap_login(chap_target, "gui-user", "gui-chap-secret")
+        st, size, _ = s.capacity() if status == 0 else (None, 0, 0)
+        ctx.check(status == 0 and size == MiB, "the listed initiator logs in with the CHAP name and secret")
+        s.logout()
+
         # File > Save Configuration As, through the common file dialog.
         saved = ctx.path("gui saved.conf")
         gui.command(main, Gui.IDM_FILE_SAVE_CONFIG)
@@ -1849,6 +1901,9 @@ def test_gui(ctx):
                   f"[target {TARGET}]\nram = 64M\nimage = {os.path.basename(iso)}\n"
                   f"cdrom = {os.path.basename(disc)}\n" in text,
                   "File > Save Configuration As writes the targets added in the GUI (paths relative to the file)")
+        ctx.check(f"[target {chap_target}]\nallow-initiator = {DEFAULT_INITIATOR}\nchap-user = gui-user\n"
+                  "chap-secret = gui-chap-secret\nram = 1M\n" in text,
+                  "File > Save Configuration As writes the access settings set in the GUI")
 
         gui.command(main, Gui.IDM_LANG_FIRST + 1)  # View > Language > 日本語
         japanese = gui.top_window()

@@ -199,7 +199,9 @@ These are deliberate. Don't "fix" them back to the original behavior.
   resolves paths against the file's folder. The GUI keeps a `DiskSpec` per
   LUN (stable names taken when the disk is chosen, since numbers can change
   before saving) and the file's other settings in `App::settings`, which it
-  does not use but saves again.
+  does not use but saves again. Access settings are set when a target is
+  added (`AccessDialog`, checked like `config::Validate`). Existing targets
+  keep theirs: login threads read `IscsiTarget::access` without a lock.
 - Startup (CLI): a target opens with all its disks or not at all, so LUN
   numbers never shift. `--wait` retries failures that may go away
   (`MayAppearLater`: missing device, volume or file) once a second, and a
@@ -290,8 +292,6 @@ These are deliberate. Don't "fix" them back to the original behavior.
   disks; so far only `ldm_tool.py` images are covered.
 - GUI flows that need administrator rights are not automated: adding
   physical disks, volumes and unmounted dynamic volumes.
-- The GUI applies and saves the access settings (allowed initiators, CHAP)
-  of opened configuration files but cannot edit them yet.
 - CHAP is checked against this repository's test initiator and (elevated
   optical test) the Microsoft initiator's one-way CHAP; mutual CHAP with
   the Microsoft or Linux initiator has not been tried.
