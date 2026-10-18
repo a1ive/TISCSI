@@ -48,12 +48,13 @@ write a log file next to the executable.
 
 `TISCSICli.exe` serves disk images and RAM disks. Images are recognized by
 extension: VHD (fixed, dynamic, differencing), VMDK (sparse, flat, split,
-delta) and raw images for anything else. Each disk becomes the next LUN of
-the current target:
+delta), ISO (served as a read-only CD/DVD-ROM drive) and raw images for
+anything else. Each disk becomes the next LUN of the current target:
 
 ```bat
 TISCSICli --target iqn.2026-10.example:disk1 --image D:\disk.vhd --ram 1G
 TISCSICli --listen 192.168.1.10 --port 3260 --image-ro D:\install.vmdk --log tiscsi.log
+TISCSICli --target iqn.2026-10.example:setup --image D:\setup.iso --image D:\drivers.iso
 TISCSICli --create-vhd D:\new.vhd --size 20G --dynamic --image D:\new.vhd
 ```
 

@@ -20,9 +20,16 @@ helper, because the Microsoft tools for that need administrator rights.
 Dynamic volume tests use images of LDM disks built by `ldm_tool.py` (every
 layout, degraded volumes, damaged header copies).
 
+Optical disc tests serve `.iso` images and check the CD/DVD-ROM (MMC)
+commands. `iso_tool.py` writes small ISO 9660 images from the specification,
+so no mkisofs is needed.
+
 Run from an elevated command prompt to include the device tests: they create
 and attach a 64 MiB VHD with diskpart, serve it with `--disk`, `--volume`,
-`--disk-ro` and `--spti`, and detach it afterwards. The elevated dynamic
+`--disk-ro` and `--spti`, and detach it afterwards. The elevated optical test
+connects the Microsoft iSCSI Initiator (starting the MSiSCSI service for the
+test if it is stopped) to a CD and a DVD image and reads files from the drives
+Windows mounts; it removes the portal and the session afterwards. The elevated dynamic
 volume test converts three test VHDs to dynamic disks, creates simple,
 spanned, striped and mirrored volumes (RAID-5 too on Windows Server), and
 compares what Windows and TISCSI read and write through each other. Recent

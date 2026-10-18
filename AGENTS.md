@@ -57,9 +57,11 @@ python tests\run_tests.py -k dynamic_volumes
   skipped otherwise. `vhd_tool.py` (differencing VHDs) and `ldm_tool.py` (LDM
   disk images: every layout, MBR and GPT, multi-VBLK records, damaged header
   copies) are spec-based helpers for what those tools cannot make without
-  administrator rights.
+  administrator rights. `iso_tool.py` writes ISO 9660 images.
 - `test_devices_elevated` and `test_dynamic_volumes_elevated` need an elevated
   prompt (they attach VHDs with diskpart) and skip otherwise.
+  `test_optical_elevated` (also elevated) connects the Microsoft iSCSI
+  Initiator to `.iso` LUNs and reads files through CDFS.
 - Run the suite on Debug x64 and Release x86. All checks must pass.
 
 ## Source layout
@@ -68,9 +70,9 @@ python tests\run_tests.py -k dynamic_volumes
 |------|----------|
 | `src/Common` | Front-end helpers: i18n resource loader, text / error formatting, log file |
 | `src/Core/util` | Byte order, blocking queue, logging, iSCSI key=value text |
-| `src/Core/disk` | `Disk` interface, raw / VHD / VMDK images, RAM disk, `OpenDiskImage`, physical disks, volumes, device enumeration |
+| `src/Core/disk` | `Disk` interface, raw / VHD / VMDK / ISO images, RAM disk, `OpenDiskImage`, physical disks, volumes, device enumeration |
 | `src/Core/ldm` | LDM database parsing, disk groups, `DynamicVolume`, `ListDynamicVolumes` / `OpenDynamicVolume` |
-| `src/Core/scsi` | CDB parsing, SCSI response data, `VirtualScsiTarget`, `SptiTarget` |
+| `src/Core/scsi` | CDB parsing, SCSI and MMC (CD/DVD) response data, `VirtualScsiTarget`, `SptiTarget` |
 | `src/Core/iscsi` | PDUs, sessions, connections, `IscsiTarget`, `IscsiServer` |
 | `src/TISCSICli` | Command-line front end |
 | `src/TISCSI` | GUI front end |
@@ -148,6 +150,9 @@ These are deliberate. Don't "fix" them back to the original behavior.
   (`--ldm-disk`), with no administrator rights needed.
 - SPTI passes the initiator's expected read length through the SCSI target
   interface instead of parsing CDBs; REPORT LUNS is answered locally.
+- `.iso` images are served as read-only CD/DVD-ROM drives (iSCSI Console has
+  no optical support; its PRs #9 / #10 were never merged and were not
+  ported). Every LUN also takes MODE SENSE (10) and READ / WRITE (12).
 
 ## Design notes
 
@@ -156,9 +161,14 @@ These are deliberate. Don't "fix" them back to the original behavior.
   target (`ScsiCommandQueue`). One housekeeping thread for NOP-In keep-alive
   and session expiry. `IscsiServer::Stop()` waits for every connection
   thread (live-connection list).
-- Images are chosen by extension (`.vhd`, `.vmdk`, else raw). Read-write
-  images are opened exclusively; differencing parents are read-only and are
-  verified by UniqueId (VHD) or CID (VMDK).
+- Images are chosen by extension (`.vhd`, `.vmdk`, `.iso`, else raw).
+  Read-write images are opened exclusively; differencing parents are
+  read-only and are verified by UniqueId (VHD) or CID (VMDK).
+- Optical discs: `Disk::IsOpticalDisc()` makes `VirtualScsiTarget` report
+  device type 5 and answer MMC commands (`scsi/MmcData`) for a finalized
+  single-session disc with one data track. Up to 80 minutes (360000 sectors)
+  is a CD, larger is a DVD. The disc is always present: eject requests are
+  accepted and ignored, and no media events are reported.
 - Physical disks: read-write locks and dismounts every volume on the disk
   and asks Windows to re-read the partition table on release. Read-only takes
   no locks.
@@ -213,6 +223,12 @@ These are deliberate. Don't "fix" them back to the original behavior.
   (VDS_E_NOT_SUPPORTED, 0x80042400). The elevated LDM test skips there.
 - **`New-VHD` needs administrator rights.** Use diskpart in elevated tests,
   or the spec-based helpers otherwise.
+- **WSL2 (NAT networking) cannot reach the Windows loopback**, and listening
+  on the WSL interface triggers a firewall prompt. To test with Linux
+  open-iscsi, run `socat TCP-LISTEN:3270,bind=127.0.0.1,fork EXEC:<script>`
+  in WSL, where the script runs a Windows `python.exe` that relays its stdin
+  and stdout to 127.0.0.1:3270 (socat splits `EXEC:` arguments at `:`, so
+  keep the `C:\` path inside the script).
 
 ## Open items
 
@@ -221,6 +237,13 @@ These are deliberate. Don't "fix" them back to the original behavior.
   disks; so far only `ldm_tool.py` images are covered.
 - GUI flows that need administrator rights are not automated: adding
   physical disks, volumes and unmounted dynamic volumes.
+- Run `test_optical_elevated`: the Microsoft iSCSI Initiator has not been
+  tried against `.iso` LUNs yet. Linux (open-iscsi, `sr` driver, udev
+  `cdrom_id`) mounts and reads them. Also try iPXE `sanboot` and UEFI boot
+  from an `.iso` LUN, and the XP initiator.
+- An explicit option to serve any file as a CD/DVD-ROM regardless of its
+  extension (e.g. `--cdrom <path>` and a GUI checkbox); today only `.iso`
+  is recognized.
 - Manual checks on XP / Windows 7, including the CJK font fallback (SimSun,
   PMingLiU, Gulim on XP).
 - Not supported: compressed (streamOptimized) VMDK, VMFSSPARSE / SESPARSE,
