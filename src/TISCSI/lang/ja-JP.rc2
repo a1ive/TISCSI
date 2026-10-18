@@ -176,7 +176,7 @@ BEGIN
     IDS_READ_ONLY_SUFFIX    " (読み取り専用)"
     IDS_ERR_INVALID_TARGET_NAME "ターゲット名が有効な iSCSI 名ではありません。\n\niqn.yyyy-mm.逆順のドメイン名[:名前] または eui.<16 桁の 16 進数> の形式で入力してください。"
     IDS_ERR_NO_DISKS        "ターゲットにディスクを 1 つ以上追加してください。"
-    IDS_FILTER_IMAGES       "ディスク イメージ (*.vhd;*.vmdk;*.img)|*.vhd;*.vmdk;*.img|すべてのファイル (*.*)|*.*|"
+    IDS_FILTER_IMAGES       "ディスク イメージ (*.vhd;*.vmdk;*.img;*.iso)|*.vhd;*.vmdk;*.img;*.iso|すべてのファイル (*.*)|*.*|"
     IDS_FILTER_VHD          "仮想ハード ディスク (*.vhd)|*.vhd|"
     IDS_ERR_NO_FILE         "ファイルを指定してください。"
     IDS_ERR_OPEN_IMAGE      "ディスク イメージ {0} を開けません:\n{1}"

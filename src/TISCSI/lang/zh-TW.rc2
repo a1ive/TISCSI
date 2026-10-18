@@ -176,7 +176,7 @@ BEGIN
     IDS_READ_ONLY_SUFFIX    " (唯讀)"
     IDS_ERR_INVALID_TARGET_NAME "目標名稱不是有效的 iSCSI 名稱。\n\n請使用 iqn.yyyy-mm.反向網域名稱[:名稱] 或 eui.<16 位十六進位數字>。"
     IDS_ERR_NO_DISKS        "請至少為目標新增一個磁碟。"
-    IDS_FILTER_IMAGES       "磁碟映像 (*.vhd;*.vmdk;*.img)|*.vhd;*.vmdk;*.img|所有檔案 (*.*)|*.*|"
+    IDS_FILTER_IMAGES       "磁碟映像 (*.vhd;*.vmdk;*.img;*.iso)|*.vhd;*.vmdk;*.img;*.iso|所有檔案 (*.*)|*.*|"
     IDS_FILTER_VHD          "虛擬硬碟 (*.vhd)|*.vhd|"
     IDS_ERR_NO_FILE         "請選擇檔案。"
     IDS_ERR_OPEN_IMAGE      "無法開啟磁碟映像 {0}:\n{1}"

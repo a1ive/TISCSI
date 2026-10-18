@@ -1178,6 +1178,7 @@ class Gui:
     # Control and command IDs from src/TISCSI/resource.h
     IDOK, IDC_PORT, IDC_START, IDC_ADD_TARGET = 1, 1011, 1012, 1014
     IDC_TARGET_NAME, IDC_CREATE_RAMDISK, IDC_SIZE_MB, IDM_LANG_FIRST = 1020, 1023, 1033, 40101
+    IDC_ADD_IMAGE, IDC_PATH = 1024, 1030
 
     def __init__(self, exe, args):
         import ctypes
@@ -1257,6 +1258,12 @@ def test_gui(ctx):
         gui.set_text(ram, Gui.IDC_SIZE_MB, "64")
         gui.command(ram, Gui.IDOK)
         time.sleep(0.5)
+        iso, iso_content = make_iso(ctx, "gui.iso", 64)
+        gui.command(add, Gui.IDC_ADD_IMAGE)
+        image = gui.top_window()
+        gui.set_text(image, Gui.IDC_PATH, iso)
+        gui.command(image, Gui.IDOK)
+        time.sleep(0.5)
         gui.command(add, Gui.IDOK)
         time.sleep(0.5)
         gui.command(main, Gui.IDC_START)
@@ -1271,6 +1278,10 @@ def test_gui(ctx):
         ctx.check("1 active session(s)" in gui.status_text(main), "status bar counts the session")
         data = os.urandom(4096)
         ctx.check(s.write(0, data)[0] == 0 and s.read(0, 8)[1] == data, "RAM disk from the GUI reads and writes")
+        st, inquiry, _, _ = s.scsi(bytes([0x12, 0, 0, 0, 96, 0]), lun=1, read_len=96)
+        st2, sector, _, _ = s.scsi(cdb10(0x28, 16, 1), lun=1, read_len=2048)
+        ctx.check(st == 0 and inquiry[0] & 0x1F == 5 and st2 == 0 and sector == iso_content[16 * 2048:17 * 2048],
+                  "an .iso added in the GUI is a CD/DVD-ROM drive")
         s.logout()
         time.sleep(0.8)
         ctx.check("0 active session(s)" in gui.status_text(main), "status bar: session ended")
