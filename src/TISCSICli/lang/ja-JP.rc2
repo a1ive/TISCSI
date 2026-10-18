@@ -59,17 +59,26 @@ VHD の作成 (ディスクも指定した場合のみ、続けてサーバー�
                        (既定: どれも提供しません)\n\
   --lang <タグ>        表示言語: en-US、ja-JP、zh-CN、zh-TW、ko-KR\n\
                        (既定: Windows の表示言語)\n\
-  --help               このヘルプを表示します\n\n\
-構成ファイル:\n\
+  --help               このヘルプを表示します\n\n"
+    IDS_CLI_USAGE_MORE "構成ファイル:\n\
   --config <ファイル>  サーバー オプション、ターゲット、ディスクをファイルから\n\
                        読み込みます。同時に指定したサーバー オプションが優先されます\n\
   --save-config <ファイル>\n\
                        提供せずに、ターゲットとオプションをファイルに書き込みます。\n\
                        デバイスは固定名で保存されます\n\n\
+Windows サービス (管理者権限が必要です):\n\
+  --install-service    --config のファイルを Windows の起動時から (ログオン前から)\n\
+                       提供するサービスをインストールして開始します。もう一度\n\
+                       実行すると更新します。ログは構成ファイルの log、または\n\
+                       構成ファイルと同じフォルダーの TISCSI-service.log に書き込まれます\n\
+  --uninstall-service  サービスを停止して削除します\n\
+  --service-name <名前>\n\
+                       サービスの名前 (既定: TISCSI)\n\n\
 例:\n\
   TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
   TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n\
-  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n"
+  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n\
+  TISCSICli --install-service --config D:\\tiscsi\\server.conf\n"
     IDS_CLI_LISTENING "{0}:{1} で待ち受けています"
     IDS_CLI_TARGET "ターゲット: {0}"
     IDS_CLI_LUN "  LUN {0}: {1}、{2}{3}"
@@ -103,6 +112,13 @@ VHD の作成 (ディスクも指定した場合のみ、続けてサーバー�
     IDS_CLI_TARGET_SKIPPED "ターゲット {0} は提供されません。"
     IDS_CLI_CONFIG_SAVED "構成を {0} に保存しました。"
     IDS_CLI_WARN_UNSTABLE "警告: {0} には固定名がありません。指定どおりに保存されるため、再起動後に別のデバイスを指す可能性があります。"
+    IDS_CLI_SERVICE_DESCRIPTION "{0} の構成に従って、ディスクとディスク イメージを iSCSI で提供します。"
+    IDS_CLI_SERVICE_INSTALLED "サービス {0} をインストールしました。Windows の起動時に開始し、{1} の構成を提供します。"
+    IDS_CLI_SERVICE_UPDATED "サービス {0} を更新しました。{1} の構成を提供します。"
+    IDS_CLI_SERVICE_RUNNING "サービスは実行中です。ログ: {0}"
+    IDS_CLI_SERVICE_REMOVED "サービス {0} を削除しました。"
+    IDS_CLI_WARN_NO_WAIT "警告: 構成に wait の設定がありません。Windows の起動時にはディスクの準備ができていない可能性があります。[server] に wait = 60 などを指定してください。"
+    IDS_CLI_HINT_ADMIN_SERVICE "サービスのインストールと削除には管理者として実行する必要があります。"
     IDS_CLI_LAYOUT_SIMPLE "シンプル"
     IDS_CLI_LAYOUT_SPANNED "スパン"
     IDS_CLI_LAYOUT_STRIPED "ストライプ"
@@ -159,4 +175,12 @@ VHD の作成 (ディスクも指定した場合のみ、続けてサーバー�
     IDS_CLI_ERR_INVALID_WAIT "待ち時間が無効です: {0} (秒単位、最大 {1})"
     IDS_CLI_ERR_INVALID_SWITCH "{0} の値が無効です: {1} (yes または no を指定してください)"
     IDS_CLI_ERR_NOTHING_TO_SERVE "提供できるターゲットがありません。"
+    IDS_CLI_ERR_SERVICE_NEEDS_CONFIG "--install-service と --service には --config <ファイル> が必要です。"
+    IDS_CLI_ERR_SERVICE_OPTIONS "--install-service に指定できるのは --config と --service-name だけです。その他のオプションは構成ファイルに記述してください。"
+    IDS_CLI_ERR_INVALID_SERVICE_NAME "サービス名が無効です: {0}"
+    IDS_CLI_ERR_SERVICE_INSTALL "サービス {0} をインストールできません: {1}"
+    IDS_CLI_ERR_SERVICE_REMOVE "サービス {0} を削除できません: {1}"
+    IDS_CLI_ERR_SERVICE_START "サービス {0} を開始できません: {1}"
+    IDS_CLI_ERR_SERVICE_STOPPED "サービス {0} が停止しました (終了コード {1})。ログを確認してください: {2}"
+    IDS_CLI_ERR_NOT_SERVICE "--service は Windows のサービス コントロール マネージャーが使用します。サービスは --install-service でインストールしてください。"
 END

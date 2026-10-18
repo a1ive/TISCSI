@@ -886,6 +886,36 @@ def test_config_files(ctx):
         out, _ = process.communicate(timeout=20)
     ctx.check(f"Waiting up to 20 s for the disks of {a_target}" in out.decode("utf-8", "replace"),
               "--wait says what it is waiting for")
+
+    # --wait: an image another process has open (still copying it, say).
+    import ctypes
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateFileW.restype = ctypes.c_void_p
+    kernel32.CreateFileW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p,
+                                     ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p]
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    held = kernel32.CreateFileW(late, 0xC0000000, 0, None, 3, 0, None)  # read-write, not shared
+    process = subprocess.Popen([ctx.exe, "--lang", "en-US", "--listen", HOST, "--port", str(ctx.port),
+                                "--target", a_target, "--image", late, "--wait", "20"],
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+    try:
+        time.sleep(2)
+        ctx.check(process.poll() is None, "--wait waits for an image another process has open")
+        kernel32.CloseHandle(held)
+        listening = False
+        deadline = time.time() + 10
+        while time.time() < deadline and not listening:
+            try:
+                socket.create_connection((HOST, ctx.port), timeout=1).close()
+                listening = True
+            except OSError:
+                time.sleep(0.2)
+        ctx.check(listening, "the server starts once the other process closes the image")
+    finally:
+        if process.poll() is None:
+            os.kill(process.pid, signal.CTRL_BREAK_EVENT)
+        process.communicate(timeout=20)
     os.remove(late)
     start = time.time()
     rc, out = run_cli(ctx, "--port", str(ctx.port), "--image", late, "--wait", "2")
@@ -907,6 +937,91 @@ def test_config_files(ctx):
     ctx.check(f"Target {a_target} is not served." in server.output, "--skip-unavailable names the skipped target")
     rc, out = run_cli(ctx, "--port", str(ctx.port), "--image", late, "--skip-unavailable")
     ctx.check(rc == 2 and "None of the targets can be served" in out, "--skip-unavailable with nothing left fails")
+
+
+# ---- Windows service ---------------------------------------------------------
+
+def test_service(ctx):
+    conf = os.path.join(ctx.path("service"), "server.conf")
+    os.makedirs(os.path.dirname(conf), exist_ok=True)
+    with open(conf, "w", encoding="utf-8") as f:
+        f.write(f"[target {TARGET}]\nram = 1M\n")
+    rc, out = run_cli(ctx, "--service", "--config", conf)
+    ctx.check(rc == 1 and "--service is for the Windows service controller" in out,
+              "--service from a console says what it is for")
+    rc, out = run_cli(ctx, "--install-service")
+    ctx.check(rc == 1 and "need --config" in out, "--install-service needs --config")
+    rc, out = run_cli(ctx, "--install-service", "--config", conf, "--port", "5")
+    ctx.check(rc == 1 and "takes only --config and --service-name" in out,
+              "--install-service takes the server options from the file only")
+    rc, out = run_cli(ctx, "--install-service", "--config", conf, "--service-name", "a/b")
+    ctx.check(rc == 1 and "Invalid service name: a/b" in out, "service names cannot contain slashes")
+    if not is_elevated():
+        rc, out = run_cli(ctx, "--install-service", "--config", conf, "--service-name", "TISCSI-Test")
+        ctx.check(rc == 2 and "Access is denied" in out and "administrator" in out,
+                  "without administrator rights, --install-service explains why it failed")
+
+
+def service_config(name):
+    result = subprocess.run(["sc", "qc", name], capture_output=True, timeout=30)
+    return result.returncode, result.stdout.decode("oem", "replace")
+
+
+def test_service_elevated(ctx):
+    """Needs administrator rights: installs a test service, serves from it,
+    updates it, lets it fail on a broken configuration and removes it."""
+    if not is_elevated():
+        print("  SKIP not running as administrator")
+        return
+    name = f"TISCSI-Test-{os.getpid()}"
+    folder = ctx.path("service elevated")
+    os.makedirs(folder, exist_ok=True)
+    data = os.urandom(512)
+    ctx.make_image(os.path.join("service elevated", "disk.img"), MiB, data)
+    conf = os.path.join(folder, "server.conf")
+    with open(conf, "w", encoding="utf-8") as f:
+        f.write(f"[server]\nlisten = {HOST}\nport = {ctx.port}\nwait = 5\n[target {TARGET}]\nimage-ro = disk.img\n")
+    log = os.path.join(folder, "TISCSI-service.log")
+    try:
+        rc, out = run_cli(ctx, "--install-service", "--config", conf, "--service-name", name)
+        ctx.check(rc == 0 and f"Installed the service {name}" in out and "The service is running" in out,
+                  "--install-service installs and starts the service")
+        rc, qc = service_config(name)
+        ctx.check(rc == 0 and "AUTO_START" in qc and f'--service --config "{conf}"' in qc and "LocalSystem" in qc,
+                  "the service starts automatically, as LocalSystem, with the configuration file")
+        listening = False
+        deadline = time.time() + 15
+        while time.time() < deadline and not listening:
+            try:
+                socket.create_connection((HOST, ctx.port), timeout=1).close()
+                listening = True
+            except OSError:
+                time.sleep(0.3)
+        ctx.check(listening, "the service listens")
+        if listening:
+            s = ctx.session()
+            ctx.check(s.full_login(TARGET)[0] == 0 and s.read(0, 1)[1] == data, "the service serves the configuration")
+            s.logout()
+        text = open(log, encoding="utf-8", errors="replace").read() if os.path.exists(log) else ""
+        ctx.check(f"Listening on {HOST}:{ctx.port}" in text and "Press Ctrl+C" not in text,
+                  "the service logs (in English) to TISCSI-service.log next to the configuration")
+
+        rc, out = run_cli(ctx, "--install-service", "--config", conf, "--service-name", name)
+        ctx.check(rc == 0 and f"Updated the service {name}" in out and "The service is running" in out,
+                  "--install-service again updates and restarts the service")
+
+        with open(conf, "w", encoding="utf-8") as f:
+            f.write(f"[server]\nport = {ctx.port}\n[target {TARGET}]\nimage = missing.img\n")
+        rc, out = run_cli(ctx, "--install-service", "--config", conf, "--service-name", name)
+        ctx.check(rc == 2 and "stopped (exit code 2)" in out and "no wait setting" in out,
+                  "a configuration that cannot be served stops the service, and the install says so")
+        text = open(log, encoding="utf-8", errors="replace").read() if os.path.exists(log) else ""
+        ctx.check("Cannot open the disk image" in text and "missing.img" in text, "the service logs why it stopped")
+    finally:
+        rc, out = run_cli(ctx, "--uninstall-service", "--service-name", name)
+        ctx.check(rc == 0 and f"Removed the service {name}" in out, "--uninstall-service removes the service")
+        rc, _ = service_config(name)
+        ctx.check(rc != 0, "the service is gone")
 
 
 def test_optical_elevated(ctx):
@@ -1694,7 +1809,7 @@ def test_gui(ctx):
 
 TESTS = [test_cli_errors, test_protocol, test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
          test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_optical_images,
-         test_config_files, test_optical_elevated, test_devices_unprivileged,
+         test_config_files, test_service, test_service_elevated, test_optical_elevated, test_devices_unprivileged,
          test_devices_elevated, test_dynamic_volumes, test_dynamic_volumes_elevated, test_gui]
 
 

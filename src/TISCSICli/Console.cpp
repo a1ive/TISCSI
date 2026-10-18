@@ -11,10 +11,15 @@ namespace tiscsi::cli {
 namespace {
 
 std::mutex g_outputMutex;
+OutputSink g_sink;
 
 void Write(DWORD stdHandle, std::wstring_view text)
 {
     std::lock_guard lock(g_outputMutex);
+    if (g_sink) {
+        g_sink(stdHandle == STD_ERROR_HANDLE, text);
+        return;
+    }
     HANDLE handle = GetStdHandle(stdHandle);
     if (handle == nullptr || handle == INVALID_HANDLE_VALUE) {
         return;
@@ -34,5 +39,11 @@ void Write(DWORD stdHandle, std::wstring_view text)
 void WriteOut(std::wstring_view text) { Write(STD_OUTPUT_HANDLE, text); }
 
 void WriteErr(std::wstring_view text) { Write(STD_ERROR_HANDLE, text); }
+
+void SetOutputSink(OutputSink sink)
+{
+    std::lock_guard lock(g_outputMutex);
+    g_sink = std::move(sink);
+}
 
 } // namespace tiscsi::cli

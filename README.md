@@ -155,6 +155,26 @@ its disks or not at all, so LUN numbers never shift. Without
 `skip-unavailable = yes` (`--skip-unavailable`) nothing is served if a target
 cannot be opened.
 
+### Windows service
+
+To serve a configuration from Windows startup on, before anyone logs on,
+install it as a service (from an elevated command prompt):
+
+```bat
+TISCSICli --install-service --config D:\tiscsi\server.conf
+TISCSICli --uninstall-service
+```
+
+The service, named `TISCSI` (`--service-name` for another), runs as
+LocalSystem, starts automatically and is started right away. Running
+`--install-service` again updates it. It logs to the configuration's `log`,
+or to `TISCSI-service.log` next to the configuration file. Set `wait` in the
+configuration (e.g. `wait = 60`), since disks may not be ready yet when the
+service starts; if the service still fails, Windows starts it again after a
+minute, up to three times a day. Allow the iSCSI port (3260) through the
+firewall for other computers to connect. In Windows PE, start
+`TISCSICli --config ...` from `startnet.cmd` instead.
+
 ## Language
 
 The UI follows the Windows display language. To override it, choose

@@ -60,16 +60,25 @@ Server:\n\
                        (default: serve none)\n\
   --lang <tag>         Language: en-US, ja-JP, zh-CN, zh-TW\n\
                        or ko-KR (default: Windows language)\n\
-  --help               Show this help\n\n\
-Configuration files:\n\
+  --help               Show this help\n\n"
+    IDS_CLI_USAGE_MORE "Configuration files:\n\
   --config <file>      Read the server options, targets and disks from a file;\n\
                        server options given as well override the file's\n\
   --save-config <file> Write the targets and options to a file instead of\n\
                        serving; devices are saved by their stable names\n\n\
+Windows service (needs administrator rights):\n\
+  --install-service    Install the service that serves the --config file from\n\
+                       Windows startup on, before anyone logs on, and start\n\
+                       it; run again to update it. It logs to the file's log,\n\
+                       or to TISCSI-service.log next to the configuration file\n\
+  --uninstall-service  Stop and remove the service\n\
+  --service-name <name>\n\
+                       Name of the service (default: TISCSI)\n\n\
 Example:\n\
   TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
   TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n\
-  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n"
+  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n\
+  TISCSICli --install-service --config D:\\tiscsi\\server.conf\n"
     IDS_CLI_LISTENING "Listening on {0}:{1}"
     IDS_CLI_TARGET "Target: {0}"
     IDS_CLI_LUN "  LUN {0}: {1}, {2}{3}"
@@ -103,6 +112,13 @@ Example:\n\
     IDS_CLI_TARGET_SKIPPED "Target {0} is not served."
     IDS_CLI_CONFIG_SAVED "Saved the configuration to {0}."
     IDS_CLI_WARN_UNSTABLE "Warning: {0} has no stable name. It is saved as given and may refer to another device after a restart."
+    IDS_CLI_SERVICE_DESCRIPTION "Serves disks and disk images over iSCSI as configured in {0}."
+    IDS_CLI_SERVICE_INSTALLED "Installed the service {0}. It starts with Windows and serves {1}."
+    IDS_CLI_SERVICE_UPDATED "Updated the service {0}. It serves {1}."
+    IDS_CLI_SERVICE_RUNNING "The service is running. It logs to {0}."
+    IDS_CLI_SERVICE_REMOVED "Removed the service {0}."
+    IDS_CLI_WARN_NO_WAIT "Warning: the configuration has no wait setting. When Windows starts, the disks may not be ready yet; consider wait = 60 in [server]."
+    IDS_CLI_HINT_ADMIN_SERVICE "Installing and removing the service requires running as administrator."
     IDS_CLI_LAYOUT_SIMPLE "simple"
     IDS_CLI_LAYOUT_SPANNED "spanned"
     IDS_CLI_LAYOUT_STRIPED "striped"
@@ -159,4 +175,12 @@ Example:\n\
     IDS_CLI_ERR_INVALID_WAIT "Invalid waiting time: {0} (seconds, at most {1})"
     IDS_CLI_ERR_INVALID_SWITCH "Invalid value for {0}: {1} (use yes or no)"
     IDS_CLI_ERR_NOTHING_TO_SERVE "None of the targets can be served."
+    IDS_CLI_ERR_SERVICE_NEEDS_CONFIG "--install-service and --service need --config <file>."
+    IDS_CLI_ERR_SERVICE_OPTIONS "--install-service takes only --config and --service-name; put the other options in the configuration file."
+    IDS_CLI_ERR_INVALID_SERVICE_NAME "Invalid service name: {0}"
+    IDS_CLI_ERR_SERVICE_INSTALL "Cannot install the service {0}: {1}"
+    IDS_CLI_ERR_SERVICE_REMOVE "Cannot remove the service {0}: {1}"
+    IDS_CLI_ERR_SERVICE_START "Cannot start the service {0}: {1}"
+    IDS_CLI_ERR_SERVICE_STOPPED "The service {0} stopped (exit code {1}). See its log: {2}"
+    IDS_CLI_ERR_NOT_SERVICE "--service is for the Windows service controller. Install the service with --install-service."
 END

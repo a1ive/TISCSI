@@ -6,6 +6,7 @@
 #include "Common/I18n.h"
 #include "Console.h"
 #include "Core/disk/Vhd.h"
+#include "Service.h"
 #include "resource.h"
 
 #include <algorithm>
@@ -48,7 +49,8 @@ std::wstring FindOption(int argc, wchar_t** argv, std::wstring_view option)
 
 bool IsCliOptionWithValue(std::wstring_view name)
 {
-    for (std::wstring_view option : {L"--target", L"--lang", L"--create-vhd", L"--size", L"--config", L"--save-config"}) {
+    for (std::wstring_view option :
+         {L"--target", L"--lang", L"--create-vhd", L"--size", L"--config", L"--save-config", L"--service-name"}) {
         if (name == option) {
             return true;
         }
@@ -150,6 +152,13 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
         }
         if (arg.name == L"--skip-unavailable") {
             options.server.skipUnavailable = true;
+            options.serverOptionsGiven = true;
+            continue;
+        }
+        if (arg.name == L"--install-service" || arg.name == L"--uninstall-service" || arg.name == L"--service") {
+            options.service = arg.name == L"--install-service"     ? Options::ServiceAction::Install
+                              : arg.name == L"--uninstall-service" ? Options::ServiceAction::Uninstall
+                                                                   : Options::ServiceAction::Run;
             continue;
         }
 
@@ -184,8 +193,14 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
             options.createSize = *size;
         } else if (arg.name == L"--save-config") {
             options.saveConfigFile = *value;
+        } else if (arg.name == L"--service-name") {
+            if (!IsValidServiceName(*value)) {
+                return i18n::Format(IDS_CLI_ERR_INVALID_SERVICE_NAME, *value);
+            }
+            options.serviceName = *value;
         } else if (!cliOption) {
             error = builder.Apply(key, *value);
+            options.serverOptionsGiven = options.serverOptionsGiven || config::ConfigBuilder::IsServerKey(key);
         }
         // --lang and --config were handled before.
         if (error) {
@@ -196,8 +211,21 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
         }
     }
 
-    if (options.help || options.list) {
+    if (options.serviceName.empty()) {
+        options.serviceName = kDefaultServiceName;
+    }
+    if (options.help || options.list || options.service == Options::ServiceAction::Uninstall) {
         return std::nullopt;
+    }
+    if (options.service != Options::ServiceAction::None) {
+        // The service serves the file and nothing else.
+        if (options.configFile.empty()) {
+            return i18n::Str(IDS_CLI_ERR_SERVICE_NEEDS_CONFIG);
+        }
+        if (options.service == Options::ServiceAction::Install &&
+            (options.serverOptionsGiven || !options.saveConfigFile.empty() || !options.createVhdPath.empty())) {
+            return i18n::Str(IDS_CLI_ERR_SERVICE_OPTIONS);
+        }
     }
     const bool creating = !options.createVhdPath.empty();
     if (creating && options.createSize == 0) {

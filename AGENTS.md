@@ -62,6 +62,8 @@ python tests\run_tests.py -k dynamic_volumes
   prompt (they attach VHDs with diskpart) and skip otherwise.
   `test_optical_elevated` (also elevated) connects the Microsoft iSCSI
   Initiator to `.iso` LUNs and reads files through CDFS.
+  `test_service_elevated` installs a service named `TISCSI-Test-<pid>`
+  (never the real `TISCSI`), serves from it and removes it.
 - Run the suite on Debug x64 and Release x86. All checks must pass.
 
 ## Source layout
@@ -199,6 +201,13 @@ These are deliberate. Don't "fix" them back to the original behavior.
   numbers never shift. `--wait` retries failures that may go away
   (`MayAppearLater`: missing device, volume or file) once a second, and a
   `WSAEADDRNOTAVAIL` listening address; other errors fail at once.
+- Service (`TISCSICli/Service.cpp`): `--install-service` registers
+  `TISCSICli --service --config <absolute path>` (LocalSystem, auto start,
+  depends on Tcpip, restart on failure). The service reports running at
+  once, so waiting for devices does not hold up the service controller, and
+  stops with `Run`'s exit code as the service-specific error. It has no
+  console: `cli::SetOutputSink` sends the console output to the log, in
+  English.
 - Volumes are served through the OS volume handle, which also covers
   dynamic volumes Windows has mounted.
 - Dynamic volumes: the LDM volume GUID is the Windows volume GUID. A volume
@@ -240,6 +249,8 @@ These are deliberate. Don't "fix" them back to the original behavior.
 - **rc.exe accepts raw newlines inside strings silently**, so check `.rc2`
   files for raw newlines or tabs inside quotes. The CLI usage text uses
   `\n\` line continuations, which are fine.
+- **rc.exe limits a string literal to about 4 KB** (RC2102), hence the CLI
+  usage text in two strings (`IDS_CLI_USAGE`, `IDS_CLI_USAGE_MORE`).
 - **Test harness quirks:**
   - `CreateProcess` (via Python) rejects relative paths containing `/`, so
     `--exe` is made absolute.

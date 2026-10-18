@@ -227,6 +227,9 @@ bool MayAppearLater(const disk::OpenError& error)
         case ERROR_BAD_NETPATH:
         case ERROR_BAD_NET_NAME:
         case ERROR_UNRECOGNIZED_VOLUME:
+        // Another process has the file open (still copying it, say).
+        case ERROR_SHARING_VIOLATION:
+        case ERROR_LOCK_VIOLATION:
             return true;
         default:
             return false;

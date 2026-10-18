@@ -10,11 +10,13 @@
 #include "Core/disk/DeviceDisk.h"
 #include "Core/disk/DeviceSelector.h"
 #include "Core/disk/DiskImage.h"
+#include "Core/disk/File.h"
 #include "Core/disk/Vhd.h"
 #include "Core/scsi/SptiTarget.h"
 #include "Core/iscsi/IscsiServer.h"
 #include "Core/ldm/DynamicVolumes.h"
 #include "Options.h"
+#include "Service.h"
 #include "resource.h"
 
 #include <winsock2.h>
@@ -43,10 +45,11 @@ BOOL WINAPI ConsoleCtrlHandler(DWORD ctrlType)
     }
 }
 
-// Writes log entries to stderr and optionally to a file (UTF-8).
+// Writes log entries to stderr and optionally to a file (UTF-8). A service
+// writes only to its log file, which also receives the console output.
 class LogWriter {
 public:
-    explicit LogWriter(Severity level) : m_level(level) {}
+    LogWriter(Severity level, LogFile* serviceLog) : m_level(level), m_serviceLog(serviceLog) {}
 
     DWORD OpenFile(const std::wstring& path) { return m_file.Open(path); }
 
@@ -55,12 +58,17 @@ public:
         if (static_cast<int>(severity) > static_cast<int>(m_level)) {
             return;
         }
+        if (m_serviceLog) {
+            m_serviceLog->Write(severity, source, message);
+            return;
+        }
         cli::PrintError(cli::Utf8ToWide(LogFile::FormatLine(severity, source, message)));
         m_file.Write(severity, source, message);
     }
 
 private:
     Severity m_level;
+    LogFile* m_serviceLog;
     LogFile m_file;
 };
 
@@ -403,7 +411,8 @@ OpenResult OpenTarget(const config::TargetSpec& spec, const config::ServerConfig
 // Waits a second between attempts; false if Ctrl+C was pressed meanwhile.
 bool WaitBeforeRetry() { return WaitForSingleObject(g_stopEvent, 1000) == WAIT_TIMEOUT; }
 
-int Run(const cli::Options& options)
+// `serviceLog`: running as a service, which logs there (and only there).
+int Run(const cli::Options& options, LogFile* serviceLog = nullptr)
 {
     if (!options.createVhdPath.empty()) {
         if (!CreateImage(options)) {
@@ -417,8 +426,8 @@ int Run(const cli::Options& options)
         return SaveConfig(options);
     }
 
-    LogWriter logWriter(options.server.verbosity);
-    if (!options.server.logFile.empty()) {
+    LogWriter logWriter(options.server.verbosity, serviceLog);
+    if (!serviceLog && !options.server.logFile.empty()) {
         if (const DWORD error = logWriter.OpenFile(options.server.logFile)) {
             cli::PrintError(i18n::Format(IDS_CLI_ERR_LOG_FILE, options.server.logFile, cli::ErrorMessage(error)));
             return 2;
@@ -517,7 +526,9 @@ int Run(const cli::Options& options)
                                         info.readOnly ? i18n::Str(IDS_CLI_READ_ONLY) : std::wstring()));
         }
     }
-    cli::PrintLine(i18n::Str(IDS_CLI_PRESS_CTRL_C));
+    if (!serviceLog) {
+        cli::PrintLine(i18n::Str(IDS_CLI_PRESS_CTRL_C));
+    }
 
     WaitForSingleObject(g_stopEvent, INFINITE);
     cli::PrintLine(i18n::Str(IDS_CLI_STOPPING));
@@ -526,11 +537,70 @@ int Run(const cli::Options& options)
     return 0;
 }
 
+// The configuration's log file, or TISCSI-service.log next to the configuration.
+std::wstring ServiceLogPath(const cli::Options& options)
+{
+    if (!options.server.logFile.empty()) {
+        return disk::FullPath(options.server.logFile);
+    }
+    return disk::DirectoryOf(disk::FullPath(options.configFile)) + L"TISCSI-service.log";
+}
+
+// --service: what the installed service runs. Everything goes to the log.
+int RunService(int argc, wchar_t** argv)
+{
+    g_stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    const DWORD result = cli::RunAsService(
+        [argc, argv] {
+            cli::Options options;
+            const std::optional<std::wstring> error = cli::ParseOptions(argc, argv, options);
+            LogFile log;
+            log.Open(ServiceLogPath(options)); // there is nowhere to report a failure
+            cli::SetOutputSink([&log](bool isError, std::wstring_view text) {
+                while (!text.empty() && (text.back() == L'\n' || text.back() == L'\r')) {
+                    text.remove_suffix(1);
+                }
+                log.Write(isError ? Severity::Error : Severity::Information, "TISCSICli", cli::WideToUtf8(text));
+            });
+            int code = 1;
+            if (error) {
+                cli::PrintError(*error);
+            } else {
+                code = Run(options, &log);
+            }
+            cli::SetOutputSink({});
+            return code;
+        },
+        g_stopEvent);
+    CloseHandle(g_stopEvent);
+    if (result == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
+        cli::PrintError(i18n::Str(IDS_CLI_ERR_NOT_SERVICE));
+        return 1;
+    }
+    return static_cast<int>(result);
+}
+
+bool HasArgument(int argc, wchar_t** argv, std::wstring_view argument)
+{
+    for (int i = 1; i < argc; ++i) {
+        if (argument == argv[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace
 
 int wmain(int argc, wchar_t** argv)
 {
-    i18n::Initialize(GetModuleHandleW(nullptr), cli::FindLanguageOption(argc, argv));
+    // A service writes its messages to the log, which is in English.
+    const bool service = HasArgument(argc, argv, L"--service");
+    const std::wstring language = cli::FindLanguageOption(argc, argv);
+    i18n::Initialize(GetModuleHandleW(nullptr), language.empty() && service ? L"en-US" : language);
+    if (service) {
+        return RunService(argc, argv);
+    }
 
     cli::Options options;
     if (const auto error = cli::ParseOptions(argc, argv, options)) {
@@ -539,12 +609,21 @@ int wmain(int argc, wchar_t** argv)
         return 1;
     }
     if (options.help) {
+        // Two strings: rc.exe limits the length of one.
         cli::WriteOut(i18n::Str(IDS_CLI_USAGE));
+        cli::WriteOut(i18n::Str(IDS_CLI_USAGE_MORE));
         return 0;
     }
     if (options.list) {
         ListDevices(options.server.ldmImages);
         return 0;
+    }
+    if (options.service == cli::Options::ServiceAction::Install) {
+        return cli::InstallService(options.serviceName, disk::FullPath(options.configFile), ServiceLogPath(options),
+                                   options.server.waitSeconds > 0);
+    }
+    if (options.service == cli::Options::ServiceAction::Uninstall) {
+        return cli::UninstallService(options.serviceName);
     }
 
     g_stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);

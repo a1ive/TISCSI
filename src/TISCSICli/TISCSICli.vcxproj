@@ -51,12 +51,14 @@
   <ItemGroup>
     <ClInclude Include="Console.h" />
     <ClInclude Include="Options.h" />
+    <ClInclude Include="Service.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Console.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Options.cpp" />
+    <ClCompile Include="Service.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="TISCSICli.rc" />

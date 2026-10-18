@@ -32,6 +32,10 @@ Without administrator rights, the device tests check that every stable name
 `--list` shows finds its disk or volume (opening it then fails, except for
 removable media).
 
+The elevated service test installs a service named `TISCSI-Test-<pid>`, serves
+a configuration through it, checks its log, updates it, lets it fail on a
+broken configuration, and removes it.
+
 Run from an elevated command prompt to include the device tests: they create
 and attach a 64 MiB VHD with diskpart, serve it with `--disk`, `--volume`,
 `--disk-ro` and `--spti`, and detach it afterwards. The elevated optical test

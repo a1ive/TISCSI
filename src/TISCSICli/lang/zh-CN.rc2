@@ -56,16 +56,24 @@ BEGIN
   --skip-unavailable   某个目标无法打开时仍提供其他目标 (默认: 都不提供)\n\
   --lang <标记>        界面语言: en-US、ja-JP、zh-CN、zh-TW 或 ko-KR\n\
                        (默认: Windows 显示语言)\n\
-  --help               显示此帮助\n\n\
-配置文件:\n\
+  --help               显示此帮助\n\n"
+    IDS_CLI_USAGE_MORE "配置文件:\n\
   --config <文件>      从文件读取服务器选项、目标和磁盘；同时指定的\n\
                        服务器选项优先于文件中的设置\n\
   --save-config <文件> 不提供服务，而是将目标和选项写入文件；\n\
                        设备以固定名称保存\n\n\
+Windows 服务 (需要管理员权限):\n\
+  --install-service    安装并启动一个服务，从 Windows 启动时 (登录前) 起提供\n\
+                       --config 所指文件中的配置；再次运行则更新该服务。日志写入\n\
+                       配置文件中的 log，或配置文件旁的 TISCSI-service.log\n\
+  --uninstall-service  停止并删除该服务\n\
+  --service-name <名称>\n\
+                       服务名称 (默认: TISCSI)\n\n\
 示例:\n\
   TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
   TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n\
-  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n"
+  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n\
+  TISCSICli --install-service --config D:\\tiscsi\\server.conf\n"
     IDS_CLI_LISTENING "正在侦听 {0}:{1}"
     IDS_CLI_TARGET "目标: {0}"
     IDS_CLI_LUN "  LUN {0}: {1}，{2}{3}"
@@ -99,6 +107,13 @@ BEGIN
     IDS_CLI_TARGET_SKIPPED "不提供目标 {0}。"
     IDS_CLI_CONFIG_SAVED "已将配置保存到 {0}。"
     IDS_CLI_WARN_UNSTABLE "警告: {0} 没有固定名称，将按原样保存，重启后可能指向其他设备。"
+    IDS_CLI_SERVICE_DESCRIPTION "按照 {0} 中的配置，通过 iSCSI 提供磁盘和磁盘映像。"
+    IDS_CLI_SERVICE_INSTALLED "已安装服务 {0}。它随 Windows 启动，提供 {1} 中的配置。"
+    IDS_CLI_SERVICE_UPDATED "已更新服务 {0}。它提供 {1} 中的配置。"
+    IDS_CLI_SERVICE_RUNNING "服务正在运行。日志: {0}"
+    IDS_CLI_SERVICE_REMOVED "已删除服务 {0}。"
+    IDS_CLI_WARN_NO_WAIT "警告: 配置中没有 wait 设置。Windows 启动时磁盘可能尚未就绪，建议在 [server] 中设置 wait = 60。"
+    IDS_CLI_HINT_ADMIN_SERVICE "安装和删除服务需要以管理员身份运行。"
     IDS_CLI_LAYOUT_SIMPLE "简单"
     IDS_CLI_LAYOUT_SPANNED "跨区"
     IDS_CLI_LAYOUT_STRIPED "带区"
@@ -155,4 +170,12 @@ BEGIN
     IDS_CLI_ERR_INVALID_WAIT "等待时间无效: {0} (以秒为单位，最多 {1})"
     IDS_CLI_ERR_INVALID_SWITCH "{0} 的值无效: {1} (请使用 yes 或 no)"
     IDS_CLI_ERR_NOTHING_TO_SERVE "没有可以提供的目标。"
+    IDS_CLI_ERR_SERVICE_NEEDS_CONFIG "--install-service 和 --service 需要 --config <文件>。"
+    IDS_CLI_ERR_SERVICE_OPTIONS "--install-service 只接受 --config 和 --service-name，请将其他选项写入配置文件。"
+    IDS_CLI_ERR_INVALID_SERVICE_NAME "服务名称无效: {0}"
+    IDS_CLI_ERR_SERVICE_INSTALL "无法安装服务 {0}: {1}"
+    IDS_CLI_ERR_SERVICE_REMOVE "无法删除服务 {0}: {1}"
+    IDS_CLI_ERR_SERVICE_START "无法启动服务 {0}: {1}"
+    IDS_CLI_ERR_SERVICE_STOPPED "服务 {0} 已停止 (退出代码 {1})。请查看日志: {2}"
+    IDS_CLI_ERR_NOT_SERVICE "--service 供 Windows 服务控制管理器使用。请用 --install-service 安装服务。"
 END

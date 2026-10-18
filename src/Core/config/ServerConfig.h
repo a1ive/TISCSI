@@ -80,7 +80,7 @@ std::unique_ptr<disk::Disk> OpenDisk(const DiskSpec& spec, const std::vector<std
 bool ResolveSptiDevice(const std::wstring& selector, std::wstring& path, disk::OpenError& error);
 
 // Whether a failure to open a disk may go away by itself: the device, volume
-// or file is not there (yet).
+// or file is not there (yet), or another process has the file open.
 bool MayAppearLater(const disk::OpenError& error);
 
 // Replaces a disk number, drive letter, mount point, volume name or device

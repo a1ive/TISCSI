@@ -25,6 +25,13 @@ struct Options {
     // --save-config: write `server` there instead of serving.
     std::wstring saveConfigFile;
 
+    // --install-service, --uninstall-service, --service (the installed
+    // service's own command line) and --service-name.
+    enum class ServiceAction { None, Install, Uninstall, Run };
+    ServiceAction service = ServiceAction::None;
+    std::wstring serviceName;
+    bool serverOptionsGiven = false; // on the command line, besides --config
+
     // --create-vhd <path> --size <size> [--dynamic]
     std::wstring createVhdPath;
     uint64_t createSize = 0;
