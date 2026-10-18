@@ -17,9 +17,13 @@ BEGIN
   --image-ro <路徑>    磁碟映像，唯讀\n\
   --cdrom <路徑>       將任意檔案作為唯讀 CD/DVD-ROM 光碟機中的光碟提供\n\
   --ram <大小>         新的 RAM 磁碟，例如 512M 或 2G\n\
-  --disk <編號>        實體磁碟，可讀寫 (會鎖定其上的磁碟區)\n\
-  --disk-ro <編號>     實體磁碟，唯讀\n\
-  --volume <磁碟區>    磁碟區 (E:、掛接點或 \\\\?\\Volume{...}\\)，可讀寫\n\
+  --disk <磁碟>        實體磁碟，可讀寫 (會鎖定其上的磁碟區)。可用磁碟編號或\n\
+                       --list 顯示的固定名稱指定；固定名稱不隨磁碟編號改變\n\
+                       (serial:<序號>、gpt:{<磁碟 GUID>}、mbr:<磁碟簽章>)\n\
+  --disk-ro <磁碟>     實體磁碟，唯讀\n\
+  --volume <磁碟區>    磁碟區，可讀寫：E:、掛接點、\\\\?\\Volume{...}\\ 或\n\
+                       --list 顯示的固定名稱\n\
+                       (gpt:{<磁碟分割 GUID>}、mbr:<磁碟簽章>:<位移>)\n\
   --volume-ro <磁碟區> 磁碟區，唯讀\n\
   --dynamic-volume <ID>\n\
                        動態磁碟區 (GUID、Volume1 之類的名稱或 E:)，可讀寫；\n\
@@ -33,7 +37,8 @@ BEGIN
                        在任何 --target 之前指定的磁碟屬於\n\
                        iqn.1991-05.com.microsoft:target1\n\
   --spti <裝置>        將目標的 SCSI 命令傳遞給本機裝置\n\
-                       (\\\\.\\CdRom0、\\\\.\\Tape0、\\\\.\\Scsi2: 等)\n\
+                       (\\\\.\\CdRom0、\\\\.\\Tape0、\\\\.\\Scsi2: 等，\n\
+                       或 serial:<序號>，請參閱 --list)\n\
   --list               列出實體磁碟、磁碟區、動態磁碟區與 SCSI 裝置\n\
                        (磁碟、磁碟區與 --spti 需要系統管理員權限，\n\
                        來自 --ldm-disk 的動態磁碟區除外)\n\n\
@@ -79,6 +84,7 @@ BEGIN
     IDS_CLI_LIST_WINDOWS_VOLUME "Windows 磁碟區: {0}"
     IDS_CLI_LIST_NOT_MOUNTED "Windows 未掛接；直接從成員磁碟提供"
     IDS_CLI_DYNAMIC_VOLUME "動態磁碟區 {0}"
+    IDS_CLI_LIST_STABLE_NAMES "    固定名稱: {0}"
     IDS_CLI_LAYOUT_SIMPLE "簡單"
     IDS_CLI_LAYOUT_SPANNED "跨距"
     IDS_CLI_LAYOUT_STRIPED "等量"
@@ -107,7 +113,7 @@ BEGIN
     IDS_CLI_ERR_CREATE_NEEDS_SIZE "--create-vhd 需要 --size。"
     IDS_CLI_ERR_SIZE_WITHOUT_CREATE "--size 與 --dynamic 只能與 --create-vhd 一起使用。"
     IDS_CLI_ERR_CREATE "無法建立 {0}: {1}"
-    IDS_CLI_ERR_INVALID_DISK "磁碟編號無效: {0} (請參閱 --list)"
+    IDS_CLI_ERR_INVALID_DISK "磁碟無效: {0} (請使用磁碟編號或固定名稱，請參閱 --list)"
     IDS_CLI_ERR_SPTI_MIXED "目標 {0}: --spti 不能與磁碟或另一個 --spti 合併使用。"
     IDS_CLI_ERR_OPEN_SPTI "無法開啟 SCSI 裝置 {0}: {1}"
     IDS_CLI_ERR_DYNAMIC_DISK "{0} 是動態磁碟。從啟動器寫入很可能會損毀動態磁碟資料庫，請以唯讀方式提供 (--disk-ro)。"
@@ -120,4 +126,7 @@ BEGIN
     IDS_CLI_ERR_VOLUME_FAILED "無法使用動態磁碟區「{0}」: 存放其資料的磁碟遺失。"
     IDS_CLI_ERR_DEGRADED_WRITE "動態磁碟區「{0}」缺少成員磁碟。寫入會使各成員不一致，請以唯讀方式提供 (--dynamic-volume-ro)。"
     IDS_CLI_ERR_LDM_UNUSED "--ldm-disk 只能與 --dynamic-volume、--dynamic-volume-ro 或 --list 一起使用。"
+    IDS_CLI_ERR_INVALID_DEVICE_NAME "裝置名稱無效: {0} (請參閱 --list)"
+    IDS_CLI_ERR_NO_SUCH_DEVICE "沒有名為「{0}」的裝置 (請參閱 --list)。"
+    IDS_CLI_ERR_AMBIGUOUS_DEVICE "有多個裝置名為「{0}」，請使用其他名稱 (請參閱 --list)。"
 END

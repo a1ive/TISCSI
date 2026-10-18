@@ -832,12 +832,68 @@ def find_listed_volume(listing, disk_index):
     return match.group(1) if match else None
 
 
+def listed_stable_names(listing, entry):
+    """Stable names on the "    stable names:" line right after the --list
+    line `entry` (a regex matching the whole line), or []."""
+    match = re.search(r"^" + entry + r"\r?\n    stable names: ([^\r\n]+)", listing, re.M)
+    if not match:
+        return []
+    return [name.strip('"') for name in match.group(1).split("  ")]
+
+
+def listed_disks(listing):
+    """(disk number, stable names) of every --list disk."""
+    return [(index, listed_stable_names(listing, r"  " + index + r": [^\r\n]*"))
+            for index in re.findall(r"^  (\d+): ", listing, re.M)]
+
+
+def listed_volumes(listing):
+    """(volume name, stable name or None) of every --list volume."""
+    result = []
+    for name in re.findall(r"^  (\\\\\?\\Volume\{[^}]+\}\\)\r?$", listing, re.M):
+        names = listed_stable_names(listing, r"  " + re.escape(name) + r"\r?\n[^\r\n]*")
+        result.append((name, names[0] if names else None))
+    return result
+
+
+def probe_server(ctx, *args):
+    """Output of TISCSICli started with `args`, stopped if it starts serving."""
+    process = subprocess.Popen([ctx.exe, "--lang", "en-US", "--listen", HOST, "--port", str(ctx.port), *args],
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+    try:
+        out, _ = process.communicate(timeout=10)
+    except subprocess.TimeoutExpired:
+        os.kill(process.pid, signal.CTRL_BREAK_EVENT)
+        out, _ = process.communicate(timeout=20)
+    return out.decode("utf-8", "replace")
+
+
 def test_devices_unprivileged(ctx):
     rc, out = list_devices(ctx)
     ctx.check(rc == 0 and "Physical disks:" in out and "Volumes:" in out and "SCSI devices:" in out,
               "--list shows disks, volumes and SCSI devices")
+    disks = listed_disks(out)
+    volumes = listed_volumes(out)
+    # The system disk has a partition table, so at least one disk and volume have stable names.
+    ctx.check(any(names for _, names in disks) and any(name for _, name in volumes) and
+              all(name.startswith(("serial:", "gpt:{", "mbr:")) for _, names in disks for name in names) and
+              all(name.startswith(("gpt:{", "mbr:")) for _, name in volumes if name),
+              "--list shows stable names for disks and volumes")
     rc, out = run_tool(ctx.exe, "--lang", "en-US", "--disk", "abc")
-    ctx.check(rc == 1 and "Invalid disk number" in out, "--disk needs a number")
+    ctx.check(rc == 1 and "Invalid disk" in out, "--disk needs a number or a stable name")
+    for name in ("mbr:XYZ", "mbr:0", "mbr:1234:5", "gpt:{1234}", "serial:"):
+        rc, out = run_tool(ctx.exe, "--lang", "en-US", "--disk", name)
+        ctx.check(rc == 1 and "Invalid disk" in out, f"--disk rejects {name}")
+    for name in ("mbr:1234", "gpt:not-a-guid"):
+        rc, out = run_tool(ctx.exe, "--lang", "en-US", "--volume", name)
+        ctx.check(rc == 1 and "Invalid device name" in out, f"--volume rejects {name}")
+    for option, name in (("--disk", "serial:NO-SUCH-DISK"), ("--disk", "mbr:0BADF00D"),
+                         ("--disk", "gpt:{0badf00d-0000-4000-8000-000000000001}"),
+                         ("--volume", "gpt:{0badf00d-0000-4000-8000-000000000001}"),
+                         ("--volume", "mbr:0BADF00D:1048576"), ("--spti", "serial:NO-SUCH-DEVICE")):
+        rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), option, name)
+        ctx.check(rc == 2 and f'No device has the name "{name}"' in out, f"{option} {name} matches nothing")
     rc, out = run_tool(ctx.exe, "--lang", "en-US", "--ram", "1M", "--spti", r"\\.\CdRom0")
     ctx.check(rc == 1 and "--spti cannot be combined" in out, "--spti cannot be mixed with disks")
     rc, out = run_tool(ctx.exe, "--lang", "en-US", "--volume", "Q:\\no\\such\\mount\\")
@@ -846,6 +902,18 @@ def test_devices_unprivileged(ctx):
         rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), "--disk", "0")
         ctx.check(rc == 2 and "Access is denied" in out and "administrator" in out,
                   "without administrator rights, --disk explains why it failed")
+        # Opening usually fails, but the error names the device the stable
+        # name matched. Removable media may be readable without
+        # administrator rights; then the LUN line names it.
+        for index, names in disks:
+            for name in names:
+                out = probe_server(ctx, "--disk-ro", name.upper())
+                ctx.check(rf"\\.\PhysicalDrive{index}" in out or f"Physical disk {index} (" in out,
+                          f"--disk-ro {name.upper()} finds disk {index}")
+        for volume, name in volumes:
+            if name:
+                out = probe_server(ctx, "--volume-ro", name)
+                ctx.check(volume in out, f"--volume-ro {name} finds {volume}")
 
 
 def diskpart(ctx, name, commands):
@@ -920,6 +988,26 @@ def test_devices_elevated(ctx):
             st, data, _, _ = s.write(8, bytes(4096))
             ctx.check(st == 2 and sense_key(data) == 7, "--disk-ro: writes are refused")
             s.logout()
+
+        disk_names = [name for name in dict(listed_disks(out)).get(index, []) if name.startswith("mbr:")]
+        ctx.check(len(disk_names) == 1, "--list shows the test VHD's MBR disk signature")
+        for name in disk_names:
+            with Server(ctx, ["--target", TARGET, "--disk-ro", name]):
+                s = ctx.session()
+                s.full_login(TARGET)
+                st, data, _, _ = s.read(8, 8)
+                ctx.check(st == 0 and data == pattern, f"--disk-ro {name}: serves the test VHD")
+                s.logout()
+        volume_name = dict(listed_volumes(out)).get(volume) if volume else None
+        ctx.check(bool(volume_name and disk_names and volume_name.startswith(disk_names[0] + ":")),
+                  "--list shows the volume's MBR stable name")
+        if volume_name:
+            with Server(ctx, ["--target", TARGET, "--volume-ro", volume_name]):
+                s = ctx.session()
+                s.full_login(TARGET)
+                st, data, _, _ = s.read(0, 1)
+                ctx.check(st == 0 and data[82:90] == b"FAT32   ", f"--volume-ro {volume_name}: serves the volume")
+                s.logout()
 
         try:
             with Server(ctx, ["--target", TARGET, "--spti", rf"\\.\PhysicalDrive{index}"]):

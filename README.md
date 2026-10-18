@@ -74,6 +74,27 @@ TISCSICli --target iqn.2026-10.example:cdrom --spti \\.\CdRom0
 Serving a disk or volume read-write locks and dismounts its volumes until the
 server stops.
 
+Disk numbers, device paths and drive letters can change after a restart, on
+another computer or in Windows PE. `--list` also shows stable names, which
+can be used instead:
+
+| Device | Stable names |
+|--------|--------------|
+| Physical disk (`--disk`, `--disk-ro`) | `serial:<serial number>`, `gpt:{<disk GUID>}`, `mbr:<disk signature>` |
+| Volume (`--volume`, `--volume-ro`) | `gpt:{<partition GUID>}`, `mbr:<disk signature>:<offset in bytes>` |
+| SCSI device (`--spti`) | `serial:<serial number>` |
+
+```bat
+TISCSICli --target iqn.2026-10.example:pc01 --disk serial:ZDHBR2TW
+TISCSICli --target iqn.2026-10.example:data --volume-ro mbr:86C7075B:1048576
+```
+
+A name must match exactly one device; a serial number or signature that two
+devices share is not offered. The serial number survives repartitioning (an
+initiator that reinstalls Windows on a served disk changes its GPT GUID or
+MBR signature) but is compared as Windows reports it, which can differ
+between Windows versions.
+
 Dynamic volumes (simple, spanned, striped, mirrored, RAID-5) are listed by
 `--list` and served with `--dynamic-volume` / `--dynamic-volume-ro`, by GUID,
 name or drive letter, including volumes Windows has not mounted (foreign or

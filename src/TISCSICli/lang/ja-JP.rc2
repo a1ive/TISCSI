@@ -17,9 +17,15 @@ BEGIN
   --image-ro <パス>    ディスク イメージ (読み取り専用)\n\
   --cdrom <パス>       任意のファイルを読み取り専用 CD/DVD-ROM ドライブのディスクとして提供\n\
   --ram <サイズ>       新しい RAM ディスク (例: 512M、2G)\n\
-  --disk <番号>        物理ディスク (読み書き可能。ディスク上のボリュームをロックします)\n\
-  --disk-ro <番号>     物理ディスク (読み取り専用)\n\
-  --volume <ボリューム> ボリューム (E:、マウント ポイント、\\\\?\\Volume{...}\\。読み書き可能)\n\
+  --disk <ディスク>    物理ディスク (読み書き可能。ディスク上のボリュームをロックします)。\n\
+                       ディスク番号、または --list に表示される固定名で指定します。\n\
+                       固定名はディスク番号が変わっても変わりません\n\
+                       (serial:<シリアル番号>、gpt:{<ディスク GUID>}、\n\
+                       mbr:<ディスク署名>)\n\
+  --disk-ro <ディスク> 物理ディスク (読み取り専用)\n\
+  --volume <ボリューム> ボリューム (読み書き可能): E:、マウント ポイント、\n\
+                       \\\\?\\Volume{...}\\、または --list に表示される固定名\n\
+                       (gpt:{<パーティション GUID>}、mbr:<ディスク署名>:<オフセット>)\n\
   --volume-ro <ボリューム> ボリューム (読み取り専用)\n\
   --dynamic-volume <ID>\n\
                        ダイナミック ボリューム (GUID、Volume1 などの名前、E:。\n\
@@ -33,7 +39,8 @@ BEGIN
                        --target より前に指定したディスクは\n\
                        iqn.1991-05.com.microsoft:target1 に属します。\n\
   --spti <デバイス>    ターゲットの SCSI コマンドをローカル デバイスにパススルーします\n\
-                       (\\\\.\\CdRom0、\\\\.\\Tape0、\\\\.\\Scsi2: など)\n\
+                       (\\\\.\\CdRom0、\\\\.\\Tape0、\\\\.\\Scsi2: など、\n\
+                       または serial:<シリアル番号>。--list を参照)\n\
   --list               物理ディスク、ボリューム、ダイナミック ボリューム、SCSI デバイスを\n\
                        一覧表示します (ディスク、ボリューム、--spti には管理者権限が\n\
                        必要です。--ldm-disk のダイナミック ボリュームを除く)\n\n\
@@ -79,6 +86,7 @@ VHD の作成 (ディスクも指定した場合のみ、続けてサーバー�
     IDS_CLI_LIST_WINDOWS_VOLUME "Windows のボリューム: {0}"
     IDS_CLI_LIST_NOT_MOUNTED "Windows はマウントしていません。メンバー ディスクから直接提供します"
     IDS_CLI_DYNAMIC_VOLUME "ダイナミック ボリューム {0}"
+    IDS_CLI_LIST_STABLE_NAMES "    固定名: {0}"
     IDS_CLI_LAYOUT_SIMPLE "シンプル"
     IDS_CLI_LAYOUT_SPANNED "スパン"
     IDS_CLI_LAYOUT_STRIPED "ストライプ"
@@ -107,7 +115,7 @@ VHD の作成 (ディスクも指定した場合のみ、続けてサーバー�
     IDS_CLI_ERR_CREATE_NEEDS_SIZE "--create-vhd には --size が必要です。"
     IDS_CLI_ERR_SIZE_WITHOUT_CREATE "--size と --dynamic は --create-vhd と一緒にのみ使用できます。"
     IDS_CLI_ERR_CREATE "{0} を作成できません: {1}"
-    IDS_CLI_ERR_INVALID_DISK "ディスク番号が無効です: {0} (--list で確認できます)"
+    IDS_CLI_ERR_INVALID_DISK "ディスクが無効です: {0} (ディスク番号または固定名を指定してください。--list を参照してください)"
     IDS_CLI_ERR_SPTI_MIXED "ターゲット {0}: --spti はディスクや別の --spti と組み合わせることはできません。"
     IDS_CLI_ERR_OPEN_SPTI "SCSI デバイス {0} を開けません: {1}"
     IDS_CLI_ERR_DYNAMIC_DISK "{0} はダイナミック ディスクです。イニシエーターから書き込むとダイナミック ディスクのデータベースが壊れるおそれがあるため、読み取り専用 (--disk-ro) で提供してください。"
@@ -120,4 +128,7 @@ VHD の作成 (ディスクも指定した場合のみ、続けてサーバー�
     IDS_CLI_ERR_VOLUME_FAILED "ダイナミック ボリューム「{0}」は使用できません: データを持つディスクが見つかりません。"
     IDS_CLI_ERR_DEGRADED_WRITE "ダイナミック ボリューム「{0}」はメンバー ディスクが欠けています。書き込むとメンバー間の整合性が失われるため、読み取り専用で提供してください (--dynamic-volume-ro)。"
     IDS_CLI_ERR_LDM_UNUSED "--ldm-disk は --dynamic-volume、--dynamic-volume-ro、または --list と一緒に指定してください。"
+    IDS_CLI_ERR_INVALID_DEVICE_NAME "デバイス名が無効です: {0} (--list を参照してください)"
+    IDS_CLI_ERR_NO_SUCH_DEVICE "「{0}」という名前のデバイスがありません (--list を参照してください)。"
+    IDS_CLI_ERR_AMBIGUOUS_DEVICE "「{0}」という名前のデバイスが複数あります。別の名前で指定してください (--list を参照してください)。"
 END

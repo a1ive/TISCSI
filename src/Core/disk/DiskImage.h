@@ -28,6 +28,8 @@ struct OpenError {
         AmbiguousVolume,  // several dynamic volumes have the name `path`
         VolumeFailed,     // disks holding the dynamic volume's data are missing
         DegradedWrite,    // read-write access to a dynamic volume with a missing member
+        NoSuchDevice,     // no disk, volume or SCSI device has the stable name `path`
+        AmbiguousDevice,  // several devices have the stable name `path`
     };
 
     DWORD code = ERROR_SUCCESS;

@@ -5,6 +5,7 @@
 
 #include "Common/I18n.h"
 #include "Console.h"
+#include "Core/disk/DeviceSelector.h"
 #include "Core/disk/Vhd.h"
 #include "Core/iscsi/IscsiName.h"
 #include "resource.h"
@@ -18,6 +19,9 @@
 
 namespace tiscsi::cli {
 namespace {
+
+using config::DiskSpec;
+using config::TargetSpec;
 
 struct Argument {
     std::wstring_view name;  // "--image"
@@ -70,10 +74,10 @@ std::optional<uint32_t> ParseIpv4(std::wstring_view text)
 
 TargetSpec& CurrentTarget(Options& options)
 {
-    if (options.targets.empty()) {
-        options.targets.push_back({std::format("{}:target1", iscsi::kDefaultTargetNamePrefix), {}, {}});
+    if (options.server.targets.empty()) {
+        options.server.targets.push_back({std::format("{}:target1", iscsi::kDefaultTargetNamePrefix), {}, {}});
     }
-    return options.targets.back();
+    return options.server.targets.back();
 }
 
 // A pass-through target serves one device and nothing else.
@@ -152,12 +156,12 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
             if (!iscsi::IsValidIscsiName(name)) {
                 return i18n::Format(IDS_CLI_ERR_INVALID_TARGET_NAME, *value);
             }
-            for (const TargetSpec& target : options.targets) {
+            for (const TargetSpec& target : options.server.targets) {
                 if (iscsi::EqualsIgnoreCase(target.name, name)) {
                     return i18n::Format(IDS_CLI_ERR_DUPLICATE_TARGET, *value);
                 }
             }
-            options.targets.push_back({name, {}, {}});
+            options.server.targets.push_back({name, {}, {}});
         } else if (arg.name == L"--image" || arg.name == L"--image-ro" || arg.name == L"--cdrom") {
             DiskSpec disk;
             disk.kind = DiskSpec::Kind::Image;
@@ -179,20 +183,20 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
                 return error;
             }
         } else if (arg.name == L"--disk" || arg.name == L"--disk-ro") {
-            unsigned index = 0;
-            const std::string text = WideToUtf8(*value);
-            const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), index);
-            if (ec != std::errc() || end != text.data() + text.size()) {
+            if (!disk::IsValidDiskSelector(*value)) {
                 return i18n::Format(IDS_CLI_ERR_INVALID_DISK, *value);
             }
             DiskSpec disk;
             disk.kind = DiskSpec::Kind::PhysicalDisk;
-            disk.diskIndex = index;
+            disk.path = *value;
             disk.readOnly = arg.name == L"--disk-ro";
             if (auto error = AddDisk(options, std::move(disk))) {
                 return error;
             }
         } else if (arg.name == L"--volume" || arg.name == L"--volume-ro") {
+            if (!disk::IsValidVolumeSelector(*value)) {
+                return i18n::Format(IDS_CLI_ERR_INVALID_DEVICE_NAME, *value);
+            }
             DiskSpec disk;
             disk.kind = DiskSpec::Kind::Volume;
             disk.path = *value;
@@ -209,8 +213,11 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
                 return error;
             }
         } else if (arg.name == L"--ldm-disk") {
-            options.ldmImages.push_back(*value);
+            options.server.ldmImages.push_back(*value);
         } else if (arg.name == L"--spti") {
+            if (!disk::IsValidScsiSelector(*value)) {
+                return i18n::Format(IDS_CLI_ERR_INVALID_DEVICE_NAME, *value);
+            }
             TargetSpec& target = CurrentTarget(options);
             if (!target.disks.empty() || !target.sptiDevice.empty()) {
                 return i18n::Format(IDS_CLI_ERR_SPTI_MIXED, Utf8ToWide(target.name));
@@ -221,8 +228,8 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
             if (!address) {
                 return i18n::Format(IDS_CLI_ERR_INVALID_ADDRESS, *value);
             }
-            options.address = *address;
-            options.addressText = *value;
+            options.server.address = *address;
+            options.server.addressText = *value;
         } else if (arg.name == L"--port") {
             unsigned port = 0;
             const std::string text = WideToUtf8(*value);
@@ -230,7 +237,7 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
             if (ec != std::errc() || end != text.data() + text.size() || port == 0 || port > 65535) {
                 return i18n::Format(IDS_CLI_ERR_INVALID_PORT, *value);
             }
-            options.port = static_cast<uint16_t>(port);
+            options.server.port = static_cast<uint16_t>(port);
         } else if (arg.name == L"--create-vhd") {
             options.createVhdPath = *value;
         } else if (arg.name == L"--size") {
@@ -240,13 +247,13 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
             }
             options.createSize = *size;
         } else if (arg.name == L"--log") {
-            options.logFile = *value;
+            options.server.logFile = *value;
         } else if (arg.name == L"--verbosity") {
             const std::optional<util::Severity> level = ParseVerbosity(*value);
             if (!level) {
                 return i18n::Format(IDS_CLI_ERR_INVALID_LEVEL, *value);
             }
-            options.verbosity = *level;
+            options.server.verbosity = *level;
         }
         // --lang was handled by FindLanguageOption.
     }
@@ -254,9 +261,9 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
     if (options.help || options.list) {
         return std::nullopt;
     }
-    if (!options.ldmImages.empty()) {
+    if (!options.server.ldmImages.empty()) {
         const bool servesDynamicVolume =
-            std::any_of(options.targets.begin(), options.targets.end(), [](const TargetSpec& target) {
+            std::any_of(options.server.targets.begin(), options.server.targets.end(), [](const TargetSpec& target) {
                 return std::any_of(target.disks.begin(), target.disks.end(),
                                    [](const DiskSpec& disk) { return disk.kind == DiskSpec::Kind::DynamicVolume; });
             });
@@ -272,10 +279,10 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
         return i18n::Str(IDS_CLI_ERR_SIZE_WITHOUT_CREATE);
     }
     // Creating an image alone is a complete command; serving needs disks.
-    if (options.targets.empty() && !creating) {
+    if (options.server.targets.empty() && !creating) {
         return i18n::Str(IDS_CLI_ERR_NO_DISKS);
     }
-    for (const TargetSpec& target : options.targets) {
+    for (const TargetSpec& target : options.server.targets) {
         if (target.disks.empty() && target.sptiDevice.empty()) {
             return i18n::Format(IDS_CLI_ERR_TARGET_WITHOUT_DISKS, Utf8ToWide(target.name));
         }

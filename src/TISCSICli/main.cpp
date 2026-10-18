@@ -6,10 +6,10 @@
 #include "Common/I18n.h"
 #include "Common/LogFile.h"
 #include "Console.h"
+#include "Core/config/ServerConfig.h"
 #include "Core/disk/DeviceDisk.h"
+#include "Core/disk/DeviceSelector.h"
 #include "Core/disk/DiskImage.h"
-#include "Core/disk/IsoImage.h"
-#include "Core/disk/RamDisk.h"
 #include "Core/disk/Vhd.h"
 #include "Core/scsi/SptiTarget.h"
 #include "Core/iscsi/IscsiServer.h"
@@ -99,6 +99,12 @@ void PrintOpenError(const disk::OpenError& error, bool device)
     case disk::OpenError::Problem::DegradedWrite:
         cli::PrintError(i18n::Format(IDS_CLI_ERR_DEGRADED_WRITE, error.path));
         return;
+    case disk::OpenError::Problem::NoSuchDevice:
+        cli::PrintError(i18n::Format(IDS_CLI_ERR_NO_SUCH_DEVICE, error.path));
+        return;
+    case disk::OpenError::Problem::AmbiguousDevice:
+        cli::PrintError(i18n::Format(IDS_CLI_ERR_AMBIGUOUS_DEVICE, error.path));
+        return;
     case disk::OpenError::Problem::None:
         // error.path may name a parent or extent file rather than the image itself.
         cli::PrintError(i18n::Format(device ? IDS_CLI_ERR_OPEN_DEVICE : IDS_CLI_ERR_OPEN_IMAGE, error.path,
@@ -169,6 +175,51 @@ void ListDynamicVolumes(const std::vector<std::wstring>& images)
     }
 }
 
+template <typename Info>
+std::string Model(const Info& info)
+{
+    return info.vendor.empty() || info.product.empty() ? info.vendor + info.product
+                                                       : info.vendor + " " + info.product;
+}
+
+// The names to use in place of disk numbers, device paths and drive letters.
+void PrintStableNames(const std::vector<std::wstring>& names)
+{
+    if (names.empty()) {
+        return;
+    }
+    std::wstring text;
+    for (const std::wstring& name : names) {
+        const bool quote = name.find(L' ') != std::wstring::npos;
+        text += (text.empty() ? L"" : L"  ") + (quote ? L"\"" + name + L"\"" : name);
+    }
+    cli::PrintLine(i18n::Format(IDS_CLI_LIST_STABLE_NAMES, text));
+}
+
+// A device given by a stable name also shows what it matched.
+std::wstring LunDescription(const config::DiskSpec& spec, const disk::Disk& disk)
+{
+    switch (spec.kind) {
+    case config::DiskSpec::Kind::Image:
+        return spec.path;
+    case config::DiskSpec::Kind::RamDisk:
+        return i18n::Str(IDS_CLI_RAM_DISK);
+    case config::DiskSpec::Kind::PhysicalDisk: {
+        const uint32_t index = static_cast<const disk::PhysicalDisk&>(disk).Index();
+        const std::wstring description = i18n::Format(IDS_CLI_PHYSICAL_DISK, index);
+        return spec.path == std::to_wstring(index) ? description : std::format(L"{} ({})", description, spec.path);
+    }
+    case config::DiskSpec::Kind::Volume: {
+        const std::wstring description = i18n::Format(IDS_CLI_VOLUME, spec.path);
+        return disk::IsStableVolumeSelector(spec.path) ? std::format(L"{} ({})", description, disk.Description())
+                                                       : description;
+    }
+    case config::DiskSpec::Kind::DynamicVolume:
+        return i18n::Format(IDS_CLI_DYNAMIC_VOLUME, disk.Description());
+    }
+    return spec.path;
+}
+
 void ListDevices(const std::vector<std::wstring>& ldmImages)
 {
     if (!ldmImages.empty()) {
@@ -176,13 +227,16 @@ void ListDevices(const std::vector<std::wstring>& ldmImages)
         return;
     }
     cli::PrintLine(i18n::Str(IDS_CLI_LIST_DISKS));
-    for (const disk::PhysicalDiskInfo& info : disk::ListPhysicalDisks()) {
-        std::string model = info.vendor.empty() ? info.product : info.vendor + " " + info.product;
-        cli::PrintLine(i18n::Format(IDS_CLI_LIST_DISK, info.index, cli::Utf8ToWide(model), cli::FormatSize(info.size),
+    const std::vector<disk::PhysicalDiskInfo> physicalDisks = disk::ListPhysicalDisks();
+    for (const disk::PhysicalDiskInfo& info : physicalDisks) {
+        cli::PrintLine(i18n::Format(IDS_CLI_LIST_DISK, info.index, cli::Utf8ToWide(Model(info)),
+                                    cli::FormatSize(info.size),
                                     info.isDynamic ? i18n::Str(IDS_CLI_LIST_DYNAMIC) : std::wstring()));
+        PrintStableNames(disk::StableDiskSelectors(info, physicalDisks));
     }
     cli::PrintLine(i18n::Str(IDS_CLI_LIST_VOLUMES));
-    for (const disk::VolumeInfo& info : disk::ListVolumes()) {
+    const std::vector<disk::VolumeInfo> volumes = disk::ListVolumes();
+    for (const disk::VolumeInfo& info : volumes) {
         std::wstring mountPoints;
         for (const std::wstring& mountPoint : info.mountPoints) {
             mountPoints += (mountPoints.empty() ? L"" : L", ") + mountPoint;
@@ -194,11 +248,17 @@ void ListDevices(const std::vector<std::wstring>& ldmImages)
         cli::PrintLine(i18n::Format(IDS_CLI_LIST_VOLUME, info.volumeName, mountPoints.empty() ? L"-" : mountPoints,
                                     info.fileSystem.empty() ? L"-" : info.fileSystem, info.label,
                                     cli::FormatSize(info.size), disks.empty() ? L"-" : disks));
+        if (const std::optional<std::wstring> name = disk::StableVolumeSelector(info, physicalDisks, volumes)) {
+            PrintStableNames({*name});
+        }
     }
     ListDynamicVolumes({});
     cli::PrintLine(i18n::Str(IDS_CLI_LIST_SCSI));
-    for (const std::wstring& path : disk::ListScsiDevicePaths()) {
-        cli::PrintLine(L"  " + path);
+    const std::vector<disk::ScsiDeviceInfo> scsiDevices = disk::ListScsiDevices();
+    for (const disk::ScsiDeviceInfo& info : scsiDevices) {
+        const std::string model = Model(info);
+        cli::PrintLine(L"  " + info.path + (model.empty() ? L"" : L"  " + cli::Utf8ToWide(model)));
+        PrintStableNames(disk::StableScsiSelectors(info, scsiDevices));
     }
     if (!disk::IsProcessElevated()) {
         cli::PrintLine(i18n::Str(IDS_CLI_HINT_ADMIN));
@@ -239,15 +299,15 @@ int Run(const cli::Options& options)
         if (!CreateImage(options)) {
             return 2;
         }
-        if (options.targets.empty()) {
+        if (options.server.targets.empty()) {
             return 0;
         }
     }
 
-    LogWriter logWriter(options.verbosity);
-    if (!options.logFile.empty()) {
-        if (const DWORD error = logWriter.OpenFile(options.logFile)) {
-            cli::PrintError(i18n::Format(IDS_CLI_ERR_LOG_FILE, options.logFile, cli::ErrorMessage(error)));
+    LogWriter logWriter(options.server.verbosity);
+    if (!options.server.logFile.empty()) {
+        if (const DWORD error = logWriter.OpenFile(options.server.logFile)) {
+            cli::PrintError(i18n::Format(IDS_CLI_ERR_LOG_FILE, options.server.logFile, cli::ErrorMessage(error)));
             return 2;
         }
     }
@@ -264,61 +324,42 @@ int Run(const cli::Options& options)
     };
     std::vector<std::shared_ptr<iscsi::IscsiTarget>> targets;
     std::vector<std::vector<LunInfo>> lunInfo;
-    for (const cli::TargetSpec& spec : options.targets) {
+    for (const config::TargetSpec& spec : options.server.targets) {
         std::vector<LunInfo> infos;
         if (!spec.sptiDevice.empty()) {
+            std::wstring path;
+            disk::OpenError resolveError;
+            if (!config::ResolveSptiDevice(spec.sptiDevice, path, resolveError)) {
+                PrintOpenError(resolveError, true);
+                return 2;
+            }
             DWORD error = 0;
-            auto spti = scsi::SptiTarget::Open(spec.sptiDevice, util::Logger("SPTI Target", sink), error);
+            auto spti = scsi::SptiTarget::Open(path, util::Logger("SPTI Target", sink), error);
             if (!spti) {
-                cli::PrintError(i18n::Format(IDS_CLI_ERR_OPEN_SPTI, spec.sptiDevice, cli::ErrorMessage(error)));
+                cli::PrintError(i18n::Format(IDS_CLI_ERR_OPEN_SPTI, path, cli::ErrorMessage(error)));
                 PrintAdminHint(error);
                 return 2;
             }
-            infos.push_back({i18n::Format(IDS_CLI_SPTI, spec.sptiDevice, spti->LunCount()), 0, false});
+            const std::wstring device = path == spec.sptiDevice ? path : std::format(L"{} ({})", spec.sptiDevice, path);
+            infos.push_back({i18n::Format(IDS_CLI_SPTI, device, spti->LunCount()), 0, false});
             targets.push_back(std::make_shared<iscsi::IscsiTarget>(spec.name, std::move(spti)));
             lunInfo.push_back(std::move(infos));
             continue;
         }
 
         std::vector<std::unique_ptr<disk::Disk>> disks;
-        for (const cli::DiskSpec& diskSpec : spec.disks) {
-            std::unique_ptr<disk::Disk> disk;
-            std::wstring description;
+        for (const config::DiskSpec& diskSpec : spec.disks) {
             disk::OpenError error;
-            switch (diskSpec.kind) {
-            case cli::DiskSpec::Kind::Image:
-                disk = diskSpec.optical ? disk::IsoImage::Open(diskSpec.path, error)
-                                        : disk::OpenDiskImage(diskSpec.path, diskSpec.readOnly, error);
-                description = diskSpec.path;
-                break;
-            case cli::DiskSpec::Kind::PhysicalDisk:
-                disk = disk::PhysicalDisk::Open(diskSpec.diskIndex, diskSpec.readOnly, error);
-                description = i18n::Format(IDS_CLI_PHYSICAL_DISK, diskSpec.diskIndex);
-                break;
-            case cli::DiskSpec::Kind::Volume:
-                disk = disk::VolumeDisk::Open(diskSpec.path, diskSpec.readOnly, error);
-                description = i18n::Format(IDS_CLI_VOLUME, diskSpec.path);
-                break;
-            case cli::DiskSpec::Kind::DynamicVolume:
-                disk = ldm::OpenDynamicVolume(diskSpec.path, diskSpec.readOnly, options.ldmImages, error);
-                if (disk) {
-                    description = i18n::Format(IDS_CLI_DYNAMIC_VOLUME, disk->Description());
-                }
-                break;
-            case cli::DiskSpec::Kind::RamDisk:
-                disk = disk::RamDisk::Create(diskSpec.size);
-                if (!disk) {
-                    cli::PrintError(i18n::Format(IDS_CLI_ERR_RAM_ALLOC, cli::FormatSize(diskSpec.size)));
-                    return 2;
-                }
-                description = i18n::Str(IDS_CLI_RAM_DISK);
-                break;
-            }
+            std::unique_ptr<disk::Disk> disk = config::OpenDisk(diskSpec, options.server.ldmImages, error);
             if (!disk) {
-                PrintOpenError(error, diskSpec.kind != cli::DiskSpec::Kind::Image);
+                if (diskSpec.kind == config::DiskSpec::Kind::RamDisk) {
+                    cli::PrintError(i18n::Format(IDS_CLI_ERR_RAM_ALLOC, cli::FormatSize(diskSpec.size)));
+                } else {
+                    PrintOpenError(error, diskSpec.kind != config::DiskSpec::Kind::Image);
+                }
                 return 2;
             }
-            infos.push_back({std::move(description), disk->Size(), disk->IsReadOnly()});
+            infos.push_back({LunDescription(diskSpec, *disk), disk->Size(), disk->IsReadOnly()});
             disks.push_back(std::move(disk));
         }
         targets.push_back(std::make_shared<iscsi::IscsiTarget>(spec.name, std::move(disks),
@@ -331,15 +372,15 @@ int Run(const cli::Options& options)
     for (const auto& target : targets) {
         server.AddTarget(target);
     }
-    if (const int error = server.Start(options.address, options.port)) {
+    if (const int error = server.Start(options.server.address, options.server.port)) {
         cli::PrintError(i18n::Format(IDS_CLI_ERR_START, cli::ErrorMessage(static_cast<unsigned long>(error))));
         return 2;
     }
 
-    cli::PrintLine(i18n::Format(IDS_CLI_LISTENING, options.addressText, options.port));
+    cli::PrintLine(i18n::Format(IDS_CLI_LISTENING, options.server.addressText, options.server.port));
     for (size_t t = 0; t < targets.size(); ++t) {
         cli::PrintLine(i18n::Format(IDS_CLI_TARGET, cli::Utf8ToWide(targets[t]->Name())));
-        if (!options.targets[t].sptiDevice.empty()) {
+        if (!options.server.targets[t].sptiDevice.empty()) {
             cli::PrintLine(lunInfo[t].front().description);
             continue;
         }
@@ -375,7 +416,7 @@ int wmain(int argc, wchar_t** argv)
         return 0;
     }
     if (options.list) {
-        ListDevices(options.ldmImages);
+        ListDevices(options.server.ldmImages);
         return 0;
     }
 

@@ -70,7 +70,8 @@ python tests\run_tests.py -k dynamic_volumes
 |------|----------|
 | `src/Common` | Front-end helpers: i18n resource loader, text / error formatting, log file |
 | `src/Core/util` | Byte order, blocking queue, logging, iSCSI key=value text |
-| `src/Core/disk` | `Disk` interface, raw / VHD / VMDK / ISO images, RAM disk, `OpenDiskImage`, physical disks, volumes, device enumeration |
+| `src/Core/config` | `ServerConfig` (targets, disks, listening address) shared by the front ends; `OpenDisk` |
+| `src/Core/disk` | `Disk` interface, raw / VHD / VMDK / ISO images, RAM disk, `OpenDiskImage`, physical disks, volumes, device enumeration, stable device names (`DeviceSelector`) |
 | `src/Core/ldm` | LDM database parsing, disk groups, `DynamicVolume`, `ListDynamicVolumes` / `OpenDynamicVolume` |
 | `src/Core/scsi` | CDB parsing, SCSI and MMC (CD/DVD) response data, `VirtualScsiTarget`, `SptiTarget` |
 | `src/Core/iscsi` | PDUs, sessions, connections, `IscsiTarget`, `IscsiServer` |
@@ -177,6 +178,15 @@ These are deliberate. Don't "fix" them back to the original behavior.
 - Physical disks: read-write locks and dismounts every volume on the disk
   and asks Windows to re-read the partition table on release. Read-only takes
   no locks.
+- Stable device names (`disk/DeviceSelector.h`) replace disk numbers, device
+  paths and drive letters, which change across restarts and in Windows PE:
+  `serial:` / `gpt:{disk GUID}` / `mbr:<signature>` for disks,
+  `gpt:{partition GUID}` / `mbr:<signature>:<offset>` for basic volumes,
+  `serial:` for SCSI devices. Windows volume GUIDs are not used, because
+  each installation (and each Windows PE boot) assigns its own. A name must
+  match exactly one device, and `--list` offers only names that do; serial
+  first, since an initiator that repartitions a served disk changes its
+  partition table identity. Names are resolved when the disk is opened.
 - Volumes are served through the OS volume handle, which also covers
   dynamic volumes Windows has mounted.
 - Dynamic volumes: the LDM volume GUID is the Windows volume GUID. A volume
@@ -213,7 +223,8 @@ These are deliberate. Don't "fix" them back to the original behavior.
   errors come out in the system language.
 - **Shell heredocs mangle backslashes:** Python fed through a Bash heredoc
   turned `\n` in `.rc2` strings into raw line breaks. Write such scripts to
-  a file instead.
+  a file instead. Python's text mode also turns the CRLF of `.rc2` and
+  `.vcxproj` files into LF, so open them with `newline=""`.
 - **rc.exe accepts raw newlines inside strings silently**, so check `.rc2`
   files for raw newlines or tabs inside quotes. The CLI usage text uses
   `\n\` line continuations, which are fine.
@@ -222,6 +233,9 @@ These are deliberate. Don't "fix" them back to the original behavior.
     `--exe` is made absolute.
   - vmware-vdiskmanager type 6 is remote-only.
   - diskpart prints in the OEM code page, so decode with `oem`.
+  - Volumes on removable media (USB sticks) open read-only without
+    administrator rights, so an unprivileged `--volume-ro` can start
+    serving; `probe_server` stops it again.
   - Window screenshots taken with `PrintWindow` right after opening a dialog
     can catch it half-painted; wait about 2 s.
 - **Windows 11 (26100) refuses `convert dynamic` on attached VHDs**

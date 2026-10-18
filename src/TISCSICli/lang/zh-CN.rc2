@@ -17,9 +17,13 @@ BEGIN
   --image-ro <路径>    磁盘映像，只读\n\
   --cdrom <路径>       将任意文件作为只读 CD/DVD-ROM 驱动器中的光盘提供\n\
   --ram <大小>         新建内存盘，例如 512M 或 2G\n\
-  --disk <编号>        物理磁盘，可读写 (锁定其上的卷)\n\
-  --disk-ro <编号>     物理磁盘，只读\n\
-  --volume <卷>        卷 (E:、装入点或 \\\\?\\Volume{...}\\)，可读写\n\
+  --disk <磁盘>        物理磁盘，可读写 (锁定其上的卷)。可用磁盘编号或\n\
+                       --list 显示的固定名称指定；固定名称不随磁盘编号变化\n\
+                       (serial:<序列号>、gpt:{<磁盘 GUID>}、mbr:<磁盘签名>)\n\
+  --disk-ro <磁盘>     物理磁盘，只读\n\
+  --volume <卷>        卷，可读写：E:、装入点、\\\\?\\Volume{...}\\ 或\n\
+                       --list 显示的固定名称\n\
+                       (gpt:{<分区 GUID>}、mbr:<磁盘签名>:<偏移量>)\n\
   --volume-ro <卷>     卷，只读\n\
   --dynamic-volume <ID>\n\
                        动态卷 (GUID、Volume1 之类的名称或 E:)，可读写；\n\
@@ -33,7 +37,8 @@ BEGIN
                        在任何 --target 之前指定的磁盘属于\n\
                        iqn.1991-05.com.microsoft:target1\n\
   --spti <设备>        将目标的 SCSI 命令直通到本地设备\n\
-                       (\\\\.\\CdRom0、\\\\.\\Tape0、\\\\.\\Scsi2: 等)\n\
+                       (\\\\.\\CdRom0、\\\\.\\Tape0、\\\\.\\Scsi2: 等，\n\
+                       或 serial:<序列号>，请参阅 --list)\n\
   --list               列出物理磁盘、卷、动态卷和 SCSI 设备\n\
                        (磁盘、卷和 --spti 需要管理员权限，\n\
                        来自 --ldm-disk 的动态卷除外)\n\n\
@@ -79,6 +84,7 @@ BEGIN
     IDS_CLI_LIST_WINDOWS_VOLUME "Windows 卷: {0}"
     IDS_CLI_LIST_NOT_MOUNTED "Windows 未装入；直接从成员磁盘提供"
     IDS_CLI_DYNAMIC_VOLUME "动态卷 {0}"
+    IDS_CLI_LIST_STABLE_NAMES "    固定名称: {0}"
     IDS_CLI_LAYOUT_SIMPLE "简单"
     IDS_CLI_LAYOUT_SPANNED "跨区"
     IDS_CLI_LAYOUT_STRIPED "带区"
@@ -107,7 +113,7 @@ BEGIN
     IDS_CLI_ERR_CREATE_NEEDS_SIZE "--create-vhd 需要 --size。"
     IDS_CLI_ERR_SIZE_WITHOUT_CREATE "--size 和 --dynamic 只能与 --create-vhd 一起使用。"
     IDS_CLI_ERR_CREATE "无法创建 {0}: {1}"
-    IDS_CLI_ERR_INVALID_DISK "磁盘编号无效: {0} (请参阅 --list)"
+    IDS_CLI_ERR_INVALID_DISK "磁盘无效: {0} (请使用磁盘编号或固定名称，请参阅 --list)"
     IDS_CLI_ERR_SPTI_MIXED "目标 {0}: --spti 不能与磁盘或另一个 --spti 同时使用。"
     IDS_CLI_ERR_OPEN_SPTI "无法打开 SCSI 设备 {0}: {1}"
     IDS_CLI_ERR_DYNAMIC_DISK "{0} 是动态磁盘。从发起程序写入很可能会损坏动态磁盘数据库，请以只读方式提供 (--disk-ro)。"
@@ -120,4 +126,7 @@ BEGIN
     IDS_CLI_ERR_VOLUME_FAILED "无法使用动态卷“{0}”: 存放其数据的磁盘缺失。"
     IDS_CLI_ERR_DEGRADED_WRITE "动态卷“{0}”缺少成员磁盘。写入会导致各成员不一致，请以只读方式提供 (--dynamic-volume-ro)。"
     IDS_CLI_ERR_LDM_UNUSED "--ldm-disk 只能与 --dynamic-volume、--dynamic-volume-ro 或 --list 一起使用。"
+    IDS_CLI_ERR_INVALID_DEVICE_NAME "设备名称无效: {0} (请参阅 --list)"
+    IDS_CLI_ERR_NO_SUCH_DEVICE "没有名为“{0}”的设备 (请参阅 --list)。"
+    IDS_CLI_ERR_AMBIGUOUS_DEVICE "有多个设备名为“{0}”，请使用其他名称 (请参阅 --list)。"
 END

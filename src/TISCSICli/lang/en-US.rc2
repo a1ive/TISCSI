@@ -18,9 +18,15 @@ Disks (each one becomes the next LUN of the current target):\n\
   --image-ro <path>    Disk image, read-only\n\
   --cdrom <path>       Any file as the disc in a read-only CD/DVD-ROM drive\n\
   --ram <size>         New RAM disk, e.g. 512M or 2G\n\
-  --disk <n>           Physical disk n, read-write (its volumes are locked)\n\
-  --disk-ro <n>        Physical disk n, read-only\n\
-  --volume <volume>    Volume (E:, mount point or \\\\?\\Volume{...}\\), read-write\n\
+  --disk <disk>        Physical disk, read-write (its volumes are locked): a\n\
+                       disk number or a stable name shown by --list, which\n\
+                       stays the same when disk numbers change\n\
+                       (serial:<serial number>, gpt:{<disk GUID>},\n\
+                       mbr:<disk signature>)\n\
+  --disk-ro <disk>     Physical disk, read-only\n\
+  --volume <volume>    Volume, read-write: E:, a mount point,\n\
+                       \\\\?\\Volume{...}\\ or a stable name shown by --list\n\
+                       (gpt:{<partition GUID>}, mbr:<disk signature>:<offset>)\n\
   --volume-ro <volume> Volume, read-only\n\
   --dynamic-volume <id>\n\
                        Dynamic volume (GUID, name such as Volume1, or E:),\n\
@@ -35,6 +41,7 @@ Targets:\n\
                        iqn.1991-05.com.microsoft:target1\n\
   --spti <device>      Make the target pass SCSI commands through to a local\n\
                        device (\\\\.\\CdRom0, \\\\.\\Tape0, \\\\.\\Scsi2:, ...)\n\
+                       or serial:<serial number> (see --list)\n\
   --list               List physical disks, volumes, dynamic volumes and SCSI\n\
                        devices (disks, volumes and --spti need administrator\n\
                        rights, unless dynamic volumes come from --ldm-disk)\n\n\
@@ -80,6 +87,7 @@ Example:\n\
     IDS_CLI_LIST_WINDOWS_VOLUME "Windows volume: {0}"
     IDS_CLI_LIST_NOT_MOUNTED "Not mounted by Windows; served from the member disks"
     IDS_CLI_DYNAMIC_VOLUME "Dynamic volume {0}"
+    IDS_CLI_LIST_STABLE_NAMES "    stable names: {0}"
     IDS_CLI_LAYOUT_SIMPLE "simple"
     IDS_CLI_LAYOUT_SPANNED "spanned"
     IDS_CLI_LAYOUT_STRIPED "striped"
@@ -108,7 +116,7 @@ Example:\n\
     IDS_CLI_ERR_CREATE_NEEDS_SIZE "--create-vhd requires --size."
     IDS_CLI_ERR_SIZE_WITHOUT_CREATE "--size and --dynamic can only be used with --create-vhd."
     IDS_CLI_ERR_CREATE "Cannot create {0}: {1}"
-    IDS_CLI_ERR_INVALID_DISK "Invalid disk number: {0} (see --list)"
+    IDS_CLI_ERR_INVALID_DISK "Invalid disk: {0} (a disk number or a stable name; see --list)"
     IDS_CLI_ERR_SPTI_MIXED "Target {0}: --spti cannot be combined with disks or another --spti."
     IDS_CLI_ERR_OPEN_SPTI "Cannot open the SCSI device {0}: {1}"
     IDS_CLI_ERR_DYNAMIC_DISK "{0} is a dynamic disk. Writing to it from an initiator would likely corrupt the dynamic disk database; serve it read-only (--disk-ro)."
@@ -121,4 +129,7 @@ Example:\n\
     IDS_CLI_ERR_VOLUME_FAILED "The dynamic volume ""{0}"" cannot be used: disks holding its data are missing."
     IDS_CLI_ERR_DEGRADED_WRITE "The dynamic volume ""{0}"" is missing a member disk. Writing to it would leave the members inconsistent; serve it read-only (--dynamic-volume-ro)."
     IDS_CLI_ERR_LDM_UNUSED "--ldm-disk can only be used with --dynamic-volume, --dynamic-volume-ro or --list."
+    IDS_CLI_ERR_INVALID_DEVICE_NAME "Invalid device name: {0} (see --list)"
+    IDS_CLI_ERR_NO_SUCH_DEVICE "No device has the name ""{0}"" (see --list)."
+    IDS_CLI_ERR_AMBIGUOUS_DEVICE "More than one device has the name ""{0}""; use another of its names (see --list)."
 END

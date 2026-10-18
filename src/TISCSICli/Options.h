@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "Core/util/Log.h"
+#include "Core/config/ServerConfig.h"
 
 #include <cstdint>
 #include <optional>
@@ -15,36 +15,10 @@
 
 namespace tiscsi::cli {
 
-struct DiskSpec {
-    enum class Kind { Image, RamDisk, PhysicalDisk, Volume, DynamicVolume };
-    Kind kind = Kind::Image;
-    // Image: file; Volume: drive letter, mount point or volume name;
-    // DynamicVolume: GUID, name, drive letter or mount point
-    std::wstring path;
-    bool readOnly = false;  // Image, PhysicalDisk, Volume, DynamicVolume
-    bool optical = false;   // Image: served as a CD/DVD-ROM whatever its extension (--cdrom)
-    uint64_t size = 0;      // RamDisk, in bytes
-    uint32_t diskIndex = 0; // PhysicalDisk
-};
-
-struct TargetSpec {
-    std::string name;
-    std::vector<DiskSpec> disks;
-    std::wstring sptiDevice; // pass-through target; excludes disks
-};
-
 struct Options {
-    std::vector<TargetSpec> targets;
-    uint32_t address = 0; // IPv4, network byte order; 0 = all interfaces
-    std::wstring addressText = L"0.0.0.0";
-    uint16_t port = 3260;
-    std::wstring logFile;
-    util::Severity verbosity = util::Severity::Information;
+    config::ServerConfig server;
     bool help = false;
     bool list = false; // --list: show disks, volumes and SCSI devices
-    // --ldm-disk: images of dynamic disks to find dynamic volumes in, instead
-    // of the physical disks.
-    std::vector<std::wstring> ldmImages;
 
     // --create-vhd <path> --size <size> [--dynamic]
     std::wstring createVhdPath;

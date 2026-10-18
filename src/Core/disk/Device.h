@@ -75,6 +75,12 @@ struct DeviceGeometry {
 // IOCTL_DISK_GET_DRIVE_GEOMETRY_EX (disks) / IOCTL_DISK_GET_LENGTH_INFO.
 bool QueryGeometry(HANDLE device, DeviceGeometry& geometry);
 
+struct PartitionInfo {
+    uint64_t offset = 0; // in bytes
+    uint64_t length = 0;
+    GUID gptPartitionId = {}; // GPT disks: the partition's unique GUID
+};
+
 struct PhysicalDiskInfo {
     uint32_t index = 0;
     std::wstring path; // \\.\PhysicalDriveN
@@ -84,6 +90,17 @@ struct PhysicalDiskInfo {
     uint64_t size = 0;
     uint32_t bytesPerSector = 0;
     bool isDynamic = false;
+    // Partition table: the MBR disk signature or the GPT disk GUID (zero for
+    // a disk without one), and the partitions in use.
+    uint32_t mbrSignature = 0;
+    GUID gptDiskId = {};
+    std::vector<PartitionInfo> partitions;
+};
+
+struct VolumeExtent {
+    uint32_t diskNumber = 0;
+    uint64_t offset = 0; // in bytes
+    uint64_t length = 0;
 };
 
 struct VolumeInfo {
@@ -93,12 +110,21 @@ struct VolumeInfo {
     std::wstring fileSystem;
     uint64_t size = 0;
     std::vector<uint32_t> diskNumbers; // disks holding the volume's extents
+    std::vector<VolumeExtent> extents;
+};
+
+// A SCSI pass-through candidate.
+struct ScsiDeviceInfo {
+    std::wstring path; // \\.\CdRomN, \\.\TapeN or \\.\ScsiN:
+    std::string vendor;
+    std::string product;
+    std::string serialNumber;
 };
 
 std::vector<PhysicalDiskInfo> ListPhysicalDisks();
 std::vector<VolumeInfo> ListVolumes();
-// Existing \\.\CdRomN, \\.\TapeN and \\.\ScsiN: devices (SCSI pass-through candidates).
-std::vector<std::wstring> ListScsiDevicePaths();
+// Existing \\.\CdRomN, \\.\TapeN and \\.\ScsiN: devices.
+std::vector<ScsiDeviceInfo> ListScsiDevices();
 
 std::wstring PhysicalDrivePath(uint32_t index);
 // "E:", "E:\", a mount point folder or a volume name -> "\\?\Volume{...}\".

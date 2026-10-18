@@ -70,7 +70,8 @@ std::string TrimmedField(const std::vector<uint8_t>& buffer, DWORD offset)
     return first == std::string::npos ? std::string() : text.substr(first, last - first + 1);
 }
 
-void QueryDeviceDescriptor(HANDLE device, PhysicalDiskInfo& info)
+template <typename Info>
+void QueryDeviceDescriptor(HANDLE device, Info& info)
 {
     STORAGE_PROPERTY_QUERY query = {};
     query.PropertyId = StorageDeviceProperty;
@@ -88,23 +89,63 @@ void QueryDeviceDescriptor(HANDLE device, PhysicalDiskInfo& info)
     info.serialNumber = TrimmedField(buffer, descriptor->SerialNumberOffset);
 }
 
-std::vector<uint32_t> VolumeDiskNumbers(HANDLE volume)
+// IOCTL_DISK_GET_DRIVE_LAYOUT_EX into `buffer`; nullptr on failure.
+const DRIVE_LAYOUT_INFORMATION_EX* QueryDriveLayout(HANDLE disk, std::vector<uint8_t>& buffer)
+{
+    buffer.assign(sizeof(DRIVE_LAYOUT_INFORMATION_EX) + 127 * sizeof(PARTITION_INFORMATION_EX), 0);
+    DWORD returned = 0;
+    if (!DeviceIoControl(disk, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, nullptr, 0, buffer.data(),
+                         static_cast<DWORD>(buffer.size()), &returned, nullptr)) {
+        return nullptr;
+    }
+    return reinterpret_cast<const DRIVE_LAYOUT_INFORMATION_EX*>(buffer.data());
+}
+
+void QueryPartitionTable(HANDLE disk, PhysicalDiskInfo& info)
+{
+    std::vector<uint8_t> buffer;
+    const DRIVE_LAYOUT_INFORMATION_EX* layout = QueryDriveLayout(disk, buffer);
+    if (!layout) {
+        return;
+    }
+    if (layout->PartitionStyle == PARTITION_STYLE_MBR) {
+        info.mbrSignature = layout->Mbr.Signature;
+    } else if (layout->PartitionStyle == PARTITION_STYLE_GPT) {
+        info.gptDiskId = layout->Gpt.DiskId;
+    }
+    for (DWORD i = 0; i < layout->PartitionCount && i < 128; ++i) {
+        const PARTITION_INFORMATION_EX& entry = layout->PartitionEntry[i];
+        if (entry.PartitionLength.QuadPart == 0 ||
+            (entry.PartitionStyle == PARTITION_STYLE_MBR &&
+             (entry.Mbr.PartitionType == PARTITION_ENTRY_UNUSED || IsContainerPartition(entry.Mbr.PartitionType)))) {
+            continue;
+        }
+        PartitionInfo partition;
+        partition.offset = static_cast<uint64_t>(entry.StartingOffset.QuadPart);
+        partition.length = static_cast<uint64_t>(entry.PartitionLength.QuadPart);
+        if (entry.PartitionStyle == PARTITION_STYLE_GPT) {
+            partition.gptPartitionId = entry.Gpt.PartitionId;
+        }
+        info.partitions.push_back(partition);
+    }
+}
+
+std::vector<VolumeExtent> QueryVolumeExtents(HANDLE volume)
 {
     std::vector<uint8_t> buffer(sizeof(VOLUME_DISK_EXTENTS) + 31 * sizeof(DISK_EXTENT));
     DWORD returned = 0;
-    std::vector<uint32_t> disks;
+    std::vector<VolumeExtent> result;
     if (!DeviceIoControl(volume, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, nullptr, 0, buffer.data(),
                          static_cast<DWORD>(buffer.size()), &returned, nullptr)) {
-        return disks;
+        return result;
     }
     const auto* extents = reinterpret_cast<const VOLUME_DISK_EXTENTS*>(buffer.data());
     for (DWORD i = 0; i < extents->NumberOfDiskExtents && i < 32; ++i) {
-        const uint32_t disk = extents->Extents[i].DiskNumber;
-        if (std::find(disks.begin(), disks.end(), disk) == disks.end()) {
-            disks.push_back(disk);
-        }
+        const DISK_EXTENT& extent = extents->Extents[i];
+        result.push_back({extent.DiskNumber, static_cast<uint64_t>(extent.StartingOffset.QuadPart),
+                          static_cast<uint64_t>(extent.ExtentLength.QuadPart)});
     }
-    return disks;
+    return result;
 }
 
 } // namespace
@@ -268,13 +309,11 @@ bool QueryGeometry(HANDLE device, DeviceGeometry& geometry)
 
 bool IsDynamicDisk(HANDLE disk)
 {
-    std::vector<uint8_t> buffer(sizeof(DRIVE_LAYOUT_INFORMATION_EX) + 127 * sizeof(PARTITION_INFORMATION_EX));
-    DWORD returned = 0;
-    if (!DeviceIoControl(disk, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, nullptr, 0, buffer.data(),
-                         static_cast<DWORD>(buffer.size()), &returned, nullptr)) {
+    std::vector<uint8_t> buffer;
+    const DRIVE_LAYOUT_INFORMATION_EX* layout = QueryDriveLayout(disk, buffer);
+    if (!layout) {
         return false;
     }
-    const auto* layout = reinterpret_cast<const DRIVE_LAYOUT_INFORMATION_EX*>(buffer.data());
     for (DWORD i = 0; i < layout->PartitionCount && i < 128; ++i) {
         const PARTITION_INFORMATION_EX& partition = layout->PartitionEntry[i];
         if (partition.PartitionStyle == PARTITION_STYLE_MBR && partition.Mbr.PartitionType == kMbrPartitionLdm) {
@@ -308,24 +347,27 @@ std::vector<PhysicalDiskInfo> ListPhysicalDisks()
         }
         QueryDeviceDescriptor(device.get(), info);
         info.isDynamic = IsDynamicDisk(device.get());
+        QueryPartitionTable(device.get(), info);
         disks.push_back(std::move(info));
     }
     return disks;
 }
 
-std::vector<std::wstring> ListScsiDevicePaths()
+std::vector<ScsiDeviceInfo> ListScsiDevices()
 {
-    std::vector<std::wstring> paths;
+    std::vector<ScsiDeviceInfo> devices;
     for (const wchar_t* format : {L"\\\\.\\CdRom{}", L"\\\\.\\Tape{}", L"\\\\.\\Scsi{}:"}) {
         for (uint32_t index = 0; index < 32; ++index) {
-            const std::wstring path = std::vformat(format, std::make_wformat_args(index));
-            Handle device(OpenForQuery(path));
+            ScsiDeviceInfo info;
+            info.path = std::vformat(format, std::make_wformat_args(index));
+            Handle device(OpenForQuery(info.path));
             if (device.valid()) {
-                paths.push_back(path);
+                QueryDeviceDescriptor(device.get(), info); // adapters (ScsiN:) have none
+                devices.push_back(std::move(info));
             }
         }
     }
-    return paths;
+    return devices;
 }
 
 std::wstring VolumeDevicePath(const std::wstring& volumeName)
@@ -383,7 +425,13 @@ std::vector<VolumeInfo> ListVolumes()
 
         Handle device(OpenForQuery(VolumeDevicePath(name)));
         if (device.valid()) {
-            info.diskNumbers = VolumeDiskNumbers(device.get());
+            info.extents = QueryVolumeExtents(device.get());
+            for (const VolumeExtent& extent : info.extents) {
+                if (std::find(info.diskNumbers.begin(), info.diskNumbers.end(), extent.diskNumber) ==
+                    info.diskNumbers.end()) {
+                    info.diskNumbers.push_back(extent.diskNumber);
+                }
+            }
             GET_LENGTH_INFORMATION lengthInfo = {};
             if (Ioctl(device.get(), IOCTL_DISK_GET_LENGTH_INFO, lengthInfo)) {
                 info.size = static_cast<uint64_t>(lengthInfo.Length.QuadPart);

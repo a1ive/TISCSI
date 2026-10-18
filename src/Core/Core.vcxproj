@@ -51,6 +51,8 @@
     <ClInclude Include="scsi\SptiTarget.h" />
     <ClInclude Include="disk\DeviceDisk.h" />
     <ClInclude Include="disk\Device.h" />
+    <ClInclude Include="disk\DeviceSelector.h" />
+    <ClInclude Include="config\ServerConfig.h" />
     <ClInclude Include="disk\Vmdk.h" />
     <ClInclude Include="disk\Vhd.h" />
     <ClInclude Include="disk\DiskImage.h" />
@@ -84,6 +86,8 @@
     <ClCompile Include="scsi\SptiTarget.cpp" />
     <ClCompile Include="disk\DeviceDisk.cpp" />
     <ClCompile Include="disk\Device.cpp" />
+    <ClCompile Include="disk\DeviceSelector.cpp" />
+    <ClCompile Include="config\ServerConfig.cpp" />
     <ClCompile Include="disk\Vmdk.cpp" />
     <ClCompile Include="disk\Vhd.cpp" />
     <ClCompile Include="disk\DiskImage.cpp" />

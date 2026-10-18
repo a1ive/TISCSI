@@ -17,9 +17,14 @@ BEGIN
   --image-ro <경로>    디스크 이미지, 읽기 전용\n\
   --cdrom <경로>       임의의 파일을 읽기 전용 CD/DVD-ROM 드라이브의 디스크로 제공\n\
   --ram <크기>         새 RAM 디스크 (예: 512M, 2G)\n\
-  --disk <번호>        물리적 디스크, 읽기/쓰기 (디스크의 볼륨을 잠급니다)\n\
-  --disk-ro <번호>     물리적 디스크, 읽기 전용\n\
-  --volume <볼륨>      볼륨 (E:, 탑재 지점 또는 \\\\?\\Volume{...}\\), 읽기/쓰기\n\
+  --disk <디스크>      물리적 디스크, 읽기/쓰기 (디스크의 볼륨을 잠급니다).\n\
+                       디스크 번호 또는 --list에 표시되는 고정 이름으로\n\
+                       지정합니다. 고정 이름은 디스크 번호가 바뀌어도 그대로입니다\n\
+                       (serial:<일련 번호>, gpt:{<디스크 GUID>}, mbr:<디스크 서명>)\n\
+  --disk-ro <디스크>   물리적 디스크, 읽기 전용\n\
+  --volume <볼륨>      볼륨, 읽기/쓰기: E:, 탑재 지점, \\\\?\\Volume{...}\\ 또는\n\
+                       --list에 표시되는 고정 이름\n\
+                       (gpt:{<파티션 GUID>}, mbr:<디스크 서명>:<오프셋>)\n\
   --volume-ro <볼륨>   볼륨, 읽기 전용\n\
   --dynamic-volume <ID>\n\
                        동적 볼륨 (GUID, Volume1 같은 이름 또는 E:), 읽기/쓰기.\n\
@@ -33,7 +38,8 @@ BEGIN
                        --target 앞에 지정한 디스크는\n\
                        iqn.1991-05.com.microsoft:target1에 속합니다\n\
   --spti <장치>        대상의 SCSI 명령을 로컬 장치로 패스스루합니다\n\
-                       (\\\\.\\CdRom0, \\\\.\\Tape0, \\\\.\\Scsi2: 등)\n\
+                       (\\\\.\\CdRom0, \\\\.\\Tape0, \\\\.\\Scsi2: 등\n\
+                       또는 serial:<일련 번호>, --list 참조)\n\
   --list               물리적 디스크, 볼륨, 동적 볼륨, SCSI 장치를 나열합니다\n\
                        (디스크, 볼륨, --spti에는 관리자 권한이 필요합니다.\n\
                        --ldm-disk의 동적 볼륨은 제외)\n\n\
@@ -79,6 +85,7 @@ VHD 만들기 (디스크도 지정한 경우에만 이어서 서버를 시작합
     IDS_CLI_LIST_WINDOWS_VOLUME "Windows 볼륨: {0}"
     IDS_CLI_LIST_NOT_MOUNTED "Windows가 탑재하지 않음, 구성원 디스크에서 직접 제공"
     IDS_CLI_DYNAMIC_VOLUME "동적 볼륨 {0}"
+    IDS_CLI_LIST_STABLE_NAMES "    고정 이름: {0}"
     IDS_CLI_LAYOUT_SIMPLE "단순"
     IDS_CLI_LAYOUT_SPANNED "스팬"
     IDS_CLI_LAYOUT_STRIPED "스트라이프"
@@ -107,7 +114,7 @@ VHD 만들기 (디스크도 지정한 경우에만 이어서 서버를 시작합
     IDS_CLI_ERR_CREATE_NEEDS_SIZE "--create-vhd에는 --size가 필요합니다."
     IDS_CLI_ERR_SIZE_WITHOUT_CREATE "--size와 --dynamic은 --create-vhd와 함께만 사용할 수 있습니다."
     IDS_CLI_ERR_CREATE "{0}을(를) 만들 수 없습니다: {1}"
-    IDS_CLI_ERR_INVALID_DISK "잘못된 디스크 번호: {0} (--list 참조)"
+    IDS_CLI_ERR_INVALID_DISK "잘못된 디스크: {0} (디스크 번호 또는 고정 이름, --list 참조)"
     IDS_CLI_ERR_SPTI_MIXED "대상 {0}: --spti는 디스크나 다른 --spti와 함께 사용할 수 없습니다."
     IDS_CLI_ERR_OPEN_SPTI "SCSI 장치 {0}을(를) 열 수 없습니다: {1}"
     IDS_CLI_ERR_DYNAMIC_DISK "{0}은(는) 동적 디스크입니다. 이니시에이터에서 쓰면 동적 디스크 데이터베이스가 손상될 수 있으므로 읽기 전용(--disk-ro)으로 제공하십시오."
@@ -120,4 +127,7 @@ VHD 만들기 (디스크도 지정한 경우에만 이어서 서버를 시작합
     IDS_CLI_ERR_VOLUME_FAILED "동적 볼륨 '{0}'을(를) 사용할 수 없습니다: 데이터가 있는 디스크가 없습니다."
     IDS_CLI_ERR_DEGRADED_WRITE "동적 볼륨 '{0}'에 구성원 디스크가 없습니다. 쓰면 구성원 사이의 일관성이 깨지므로 읽기 전용(--dynamic-volume-ro)으로 제공하십시오."
     IDS_CLI_ERR_LDM_UNUSED "--ldm-disk는 --dynamic-volume, --dynamic-volume-ro 또는 --list와 함께 사용해야 합니다."
+    IDS_CLI_ERR_INVALID_DEVICE_NAME "잘못된 장치 이름: {0} (--list 참조)"
+    IDS_CLI_ERR_NO_SUCH_DEVICE "이름이 '{0}'인 장치가 없습니다 (--list 참조)."
+    IDS_CLI_ERR_AMBIGUOUS_DEVICE "이름이 '{0}'인 장치가 여러 개 있습니다. 다른 이름으로 지정하십시오 (--list 참조)."
 END
