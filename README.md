@@ -113,6 +113,41 @@ Disks given before any `--target` belong to
 Read-write images are opened exclusively. Stop the server with Ctrl+C.
 Run `TISCSICli --help` for all options.
 
+### Configuration files
+
+A configuration file holds the server options and targets, so the server can
+be started without typing them again, for example from a startup script.
+`--save-config` writes one from the other options, with devices by their
+stable names and paths relative to the file:
+
+```bat
+TISCSICli --target iqn.2026-10.example:pc01 --image pc01.vhd --disk-ro 2 --wait 60 --save-config server.conf
+TISCSICli --config server.conf
+```
+
+```ini
+# TISCSI configuration (see TISCSICli --help)
+
+[server]
+listen = 0.0.0.0
+port = 3260
+wait = 60
+
+[target iqn.2026-10.example:pc01]
+image = pc01.vhd
+disk-ro = serial:ZDHBR2TW
+```
+
+Keys are the long option names without `--`; each disk key adds the next LUN.
+Server options given together with `--config` override the file's. The file
+is UTF-8; UTF-16 with a BOM and the ANSI code page are read too.
+
+At startup, `wait` (`--wait <seconds>`) waits for disks, volumes, images and
+the listening address that are not there yet. A target is served with all of
+its disks or not at all, so LUN numbers never shift. Without
+`skip-unavailable = yes` (`--skip-unavailable`) nothing is served if a target
+cannot be opened.
+
 ## Language
 
 The UI follows the Windows display language. To override it, choose

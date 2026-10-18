@@ -16,6 +16,7 @@
 #include <windows.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -49,5 +50,8 @@ DWORD ListDynamicVolumes(const std::vector<std::wstring>& images, std::vector<Dy
 // member disks; read-write access needs every member to be present.
 std::unique_ptr<disk::Disk> OpenDynamicVolume(const std::wstring& id, bool readOnly,
                                               const std::vector<std::wstring>& images, disk::OpenError& error);
+
+// The volume GUID in `id` ("{guid}", "guid" or "\\?\Volume{guid}\"), if it is one.
+std::optional<Guid> ParseDynamicVolumeGuid(const std::wstring& id);
 
 } // namespace tiscsi::ldm

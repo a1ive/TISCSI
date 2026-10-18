@@ -53,12 +53,23 @@ VHD の作成 (ディスクも指定した場合のみ、続けてサーバー�
   --port <ポート>      TCP ポート (既定: 3260)\n\
   --log <ファイル>     ログをファイルにも書き込みます\n\
   --verbosity <レベル> error、warning、info (既定)、verbose、debug のいずれか\n\
+  --wait <秒>          起動時に、まだ存在しないディスク、ボリューム、イメージ、\n\
+                       --listen のアドレスをこの秒数まで待ちます\n\
+  --skip-unavailable   開けないターゲットがあっても他のターゲットを提供します\n\
+                       (既定: どれも提供しません)\n\
   --lang <タグ>        表示言語: en-US、ja-JP、zh-CN、zh-TW、ko-KR\n\
                        (既定: Windows の表示言語)\n\
   --help               このヘルプを表示します\n\n\
+構成ファイル:\n\
+  --config <ファイル>  サーバー オプション、ターゲット、ディスクをファイルから\n\
+                       読み込みます。同時に指定したサーバー オプションが優先されます\n\
+  --save-config <ファイル>\n\
+                       提供せずに、ターゲットとオプションをファイルに書き込みます。\n\
+                       デバイスは固定名で保存されます\n\n\
 例:\n\
   TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
-  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n"
+  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n\
+  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n"
     IDS_CLI_LISTENING "{0}:{1} で待ち受けています"
     IDS_CLI_TARGET "ターゲット: {0}"
     IDS_CLI_LUN "  LUN {0}: {1}、{2}{3}"
@@ -87,6 +98,11 @@ VHD の作成 (ディスクも指定した場合のみ、続けてサーバー�
     IDS_CLI_LIST_NOT_MOUNTED "Windows はマウントしていません。メンバー ディスクから直接提供します"
     IDS_CLI_DYNAMIC_VOLUME "ダイナミック ボリューム {0}"
     IDS_CLI_LIST_STABLE_NAMES "    固定名: {0}"
+    IDS_CLI_WAITING "ターゲット {0} のディスクを最大 {1} 秒待っています..."
+    IDS_CLI_WAITING_ADDRESS "アドレス {0} を最大 {1} 秒待っています..."
+    IDS_CLI_TARGET_SKIPPED "ターゲット {0} は提供されません。"
+    IDS_CLI_CONFIG_SAVED "構成を {0} に保存しました。"
+    IDS_CLI_WARN_UNSTABLE "警告: {0} には固定名がありません。指定どおりに保存されるため、再起動後に別のデバイスを指す可能性があります。"
     IDS_CLI_LAYOUT_SIMPLE "シンプル"
     IDS_CLI_LAYOUT_SPANNED "スパン"
     IDS_CLI_LAYOUT_STRIPED "ストライプ"
@@ -131,4 +147,16 @@ VHD の作成 (ディスクも指定した場合のみ、続けてサーバー�
     IDS_CLI_ERR_INVALID_DEVICE_NAME "デバイス名が無効です: {0} (--list を参照してください)"
     IDS_CLI_ERR_NO_SUCH_DEVICE "「{0}」という名前のデバイスがありません (--list を参照してください)。"
     IDS_CLI_ERR_AMBIGUOUS_DEVICE "「{0}」という名前のデバイスが複数あります。別の名前で指定してください (--list を参照してください)。"
+    IDS_CLI_ERR_CONFIG_READ "構成ファイル {0} を読み込めません: {1}"
+    IDS_CLI_ERR_CONFIG_LINE "{0} の {1} 行目: {2}"
+    IDS_CLI_ERR_CONFIG_FILE "{0}: {1}"
+    IDS_CLI_ERR_CONFIG_MIXED "--config は --target やディスクのオプションと組み合わせることはできません。ターゲットは構成ファイルに記述してください。"
+    IDS_CLI_ERR_CONFIG_SAVE "構成ファイル {0} を書き込めません: {1}"
+    IDS_CLI_ERR_CONFIG_NOT_IN_TARGET "{0} は [target <名前>] セクションに記述してください。"
+    IDS_CLI_ERR_CONFIG_NOT_IN_SERVER "{0} は [server] セクションに記述してください。"
+    IDS_CLI_ERR_CONFIG_INVALID_LINE "設定でもセクションでもありません: {0}"
+    IDS_CLI_ERR_CONFIG_UNKNOWN_SECTION "不明なセクションです: {0}"
+    IDS_CLI_ERR_INVALID_WAIT "待ち時間が無効です: {0} (秒単位、最大 {1})"
+    IDS_CLI_ERR_INVALID_SWITCH "{0} の値が無効です: {1} (yes または no を指定してください)"
+    IDS_CLI_ERR_NOTHING_TO_SERVE "提供できるターゲットがありません。"
 END

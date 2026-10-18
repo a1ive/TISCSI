@@ -751,6 +751,164 @@ def find_cd_volume(label, timeout=30):
     return None
 
 
+# ---- Configuration files ------------------------------------------------------
+
+def run_cli(ctx, *args, cwd=None):
+    result = subprocess.run([ctx.exe, "--lang", "en-US", *args], capture_output=True, timeout=60, cwd=cwd)
+    return result.returncode, (result.stdout + result.stderr).decode("utf-8", "replace")
+
+
+def test_config_files(ctx):
+    folder = ctx.path("config")
+    os.makedirs(os.path.join(folder, "images"), exist_ok=True)
+    first = os.urandom(512)
+    ctx.make_image(os.path.join("config", "images", "a b.img"), 4 * MiB, first)
+    other = os.urandom(512)
+    ctx.make_image(os.path.join("config", "images", "磁盘.img"), 2 * MiB, other)
+    a_target, b_target = "iqn.2026-10.test:config-a", "iqn.2026-10.test:config-b"
+
+    # Hand-written: comments, odd spacing and case, quotes, relative paths.
+    conf = os.path.join(folder, "server.conf")
+    with open(conf, "w", encoding="utf-8", newline="\r\n") as f:
+        f.write(f"# comment\n; another\n[SERVER]\nport=1\n  verbosity = warning\n\n"
+                f"[target {a_target}]\nImage = \"images\\a b.img\"\nram = 1M\n"
+                f"[target {b_target}]\nimage-ro = images\\磁盘.img\n")
+    # --listen / --port given by Server override the file's.
+    with Server(ctx, ["--config", conf]) as server:
+        s = ctx.session()
+        status, _, _ = s.full_login(a_target)
+        st, size, _ = s.capacity()
+        st2, data, _, _ = s.read(0, 1)
+        st3, ram_size, _ = s.capacity(lun=1)
+        ctx.check(status == 0 and size == 4 * MiB and data == first and ram_size == MiB,
+                  "--config serves the file's targets (relative path with a space, RAM disk)")
+        s.logout()
+        s = ctx.session()
+        status, _, _ = s.full_login(b_target)
+        st, data, _, _ = s.read(0, 1)
+        st2, _, _, _ = s.write(0, bytes(512))
+        ctx.check(status == 0 and data == other and st2 == 2, "image-ro with a non-ASCII name is served read-only")
+        s.logout()
+
+    # Encodings: UTF-16 with BOM, and the ANSI code page if it has the name.
+    text = f"[target {b_target}]\r\nimage = images\\磁盘.img\r\n"
+    with open(os.path.join(folder, "utf16.conf"), "wb") as f:
+        f.write(b"\xff\xfe" + text.encode("utf-16-le"))
+    with Server(ctx, ["--config", os.path.join(folder, "utf16.conf")]):
+        s = ctx.session()
+        ctx.check(s.full_login(b_target)[0] == 0 and s.read(0, 1)[1] == other, "a UTF-16 configuration file is read")
+        s.logout()
+    try:
+        ansi = text.encode("mbcs", "strict")
+    except UnicodeEncodeError:
+        ansi = None
+    if ansi and ansi.decode("mbcs") == text:
+        with open(os.path.join(folder, "ansi.conf"), "wb") as f:
+            f.write(ansi)
+        with Server(ctx, ["--config", os.path.join(folder, "ansi.conf")]):
+            s = ctx.session()
+            ctx.check(s.full_login(b_target)[0] == 0, "an ANSI configuration file is read")
+            s.logout()
+
+    # --save-config: relative to the file's folder, read back the same.
+    saved = os.path.join(folder, "saved.conf")
+    rc, out = run_cli(ctx, "--target", a_target, "--image", os.path.join(folder, "images", "a b.img"),
+                      "--ram", "3M", "--target", b_target, "--cdrom", os.path.join(folder, "images", "磁盘.img"),
+                      "--port", "3999", "--wait", "15", "--skip-unavailable", "--save-config", saved)
+    content = open(saved, "rb").read() if os.path.exists(saved) else b""
+    ctx.check(rc == 0 and content.startswith(b"\xef\xbb\xbf"), "--save-config writes UTF-8 with a BOM")
+    text = content.decode("utf-8-sig").replace("\r\n", "\n")
+    ctx.check("port = 3999\n" in text and "wait = 15\n" in text and "skip-unavailable = yes\n" in text and
+              f"[target {a_target}]\nimage = images\\a b.img\nram = 3M\n" in text and
+              f"[target {b_target}]\ncdrom = images\\磁盘.img\n" in text,
+              "--save-config writes the options, with paths relative to the file")
+    resaved = os.path.join(folder, "resaved.conf")
+    rc, _ = run_cli(ctx, "--config", saved, "--save-config", resaved)
+    ctx.check(rc == 0 and open(resaved, "rb").read() == content, "a saved configuration reads back the same")
+    rc, out = run_cli(ctx, "--disk", "0", "--save-config", os.path.join(folder, "disk.conf"))
+    disk_text = open(os.path.join(folder, "disk.conf"), encoding="utf-8-sig").read() if rc == 0 else ""
+    ctx.check(rc == 0 and re.search(r"^disk = (serial:|gpt:\{|mbr:)", disk_text, re.M) is not None or
+              "has no stable name" in out, "--save-config saves disk 0 by a stable name")
+
+    # Errors name the file and line.
+    for name, content, expected in (
+            ("e1.conf", "[server]\nfoo = 1\n", "e1.conf, line 2: Unknown option: foo"),
+            ("e2.conf", "# x\nimage = a.img\n", "e2.conf, line 2: image must be in a [target <name>] section"),
+            ("e3.conf", f"[target {a_target}]\nport = 5\n", "e3.conf, line 2: port must be in the [server] section"),
+            ("e4.conf", "[bogus]\n", "e4.conf, line 1: Unknown section: [bogus]"),
+            ("e5.conf", "[server]\nport\n", "e5.conf, line 2: Not a setting or a section: port"),
+            ("e6.conf", "[server]\nwait = soon\n", "e6.conf, line 2: Invalid waiting time: soon"),
+            ("e7.conf", "[server]\nskip-unavailable = maybe\n", "Invalid value for skip-unavailable: maybe"),
+            ("e8.conf", f"[target {a_target}]\n[target {a_target}]\n", "line 2: The target name is used more than once"),
+            ("e9.conf", f"[target {a_target}]\n", f"e9.conf: Target {a_target} has no disks"),
+            ("e10.conf", "[target not-an-iqn]\nram = 1M\n", "line 1: Invalid iSCSI target name: not-an-iqn"),
+            ("e11.conf", "[server]\nport = 1\n", "No disks specified")):
+        path = os.path.join(folder, name)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        rc, out = run_cli(ctx, "--config", path)
+        ctx.check(rc == 1 and expected in out, f"configuration error: {expected}")
+    rc, out = run_cli(ctx, "--config", conf, "--ram", "1M")
+    ctx.check(rc == 1 and "--config cannot be combined" in out, "--config cannot be combined with disks")
+    rc, out = run_cli(ctx, "--config", os.path.join(folder, "missing.conf"))
+    ctx.check(rc == 1 and "Cannot read the configuration file" in out, "a missing configuration file is reported")
+    rc, out = run_cli(ctx, "--ram", "1M", "--wait", "100000")
+    ctx.check(rc == 1 and "Invalid waiting time" in out, "--wait has a maximum")
+
+    # --wait: an image that shows up later.
+    late = os.path.join(folder, "late.img")
+    process = subprocess.Popen([ctx.exe, "--lang", "en-US", "--listen", HOST, "--port", str(ctx.port),
+                                "--target", a_target, "--image", late, "--wait", "20"],
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+    try:
+        time.sleep(2)
+        ctx.check(process.poll() is None, "--wait keeps waiting for a missing image")
+        with open(late, "wb") as f:
+            f.write(first)
+            f.truncate(MiB)
+        listening = False
+        deadline = time.time() + 10
+        while time.time() < deadline and not listening:
+            try:
+                socket.create_connection((HOST, ctx.port), timeout=1).close()
+                listening = True
+            except OSError:
+                time.sleep(0.2)
+        ctx.check(listening, "the server starts once the image is there")
+        if listening:
+            s = ctx.session()
+            ctx.check(s.full_login(a_target)[0] == 0 and s.read(0, 1)[1] == first, "the late image is served")
+            s.logout()
+    finally:
+        if process.poll() is None:
+            os.kill(process.pid, signal.CTRL_BREAK_EVENT)
+        out, _ = process.communicate(timeout=20)
+    ctx.check(f"Waiting up to 20 s for the disks of {a_target}" in out.decode("utf-8", "replace"),
+              "--wait says what it is waiting for")
+    os.remove(late)
+    start = time.time()
+    rc, out = run_cli(ctx, "--port", str(ctx.port), "--image", late, "--wait", "2")
+    ctx.check(rc == 2 and "Cannot open the disk image" in out and 1.5 < time.time() - start < 15,
+              "--wait gives up after the time and reports the error")
+    rc, out = run_cli(ctx, "--port", str(ctx.port), "--image", ctx.path("config"), "--wait", "30")
+    ctx.check(rc == 2 and "Waiting" not in out, "--wait does not wait for errors that stay (a folder as an image)")
+
+    # --skip-unavailable: the other targets are served.
+    with Server(ctx, ["--target", a_target, "--image", late, "--target", b_target, "--ram", "1M",
+                      "--skip-unavailable"]) as server:
+        s = ctx.session()
+        ctx.check(s.full_login(b_target)[0] == 0, "--skip-unavailable serves the targets that open")
+        s.logout()
+        s = ctx.session()
+        ctx.check(s.full_login(a_target)[0] != 0, "the target that did not open is not served")
+        s.close()
+        server.stop()
+    ctx.check(f"Target {a_target} is not served." in server.output, "--skip-unavailable names the skipped target")
+    rc, out = run_cli(ctx, "--port", str(ctx.port), "--image", late, "--skip-unavailable")
+    ctx.check(rc == 2 and "None of the targets can be served" in out, "--skip-unavailable with nothing left fails")
+
+
 def test_optical_elevated(ctx):
     """Needs administrator rights: connects the Microsoft iSCSI Initiator to a
     CD and a DVD image and reads files through Windows' CD-ROM driver and CDFS."""
@@ -1449,7 +1607,7 @@ def test_gui(ctx):
 
 TESTS = [test_cli_errors, test_protocol, test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
          test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_optical_images,
-         test_optical_elevated, test_devices_unprivileged,
+         test_config_files, test_optical_elevated, test_devices_unprivileged,
          test_devices_elevated, test_dynamic_volumes, test_dynamic_volumes_elevated, test_gui]
 
 

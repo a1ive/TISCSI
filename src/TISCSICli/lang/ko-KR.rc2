@@ -52,12 +52,22 @@ VHD 만들기 (디스크도 지정한 경우에만 이어서 서버를 시작합
   --port <포트>        TCP 포트 (기본값: 3260)\n\
   --log <파일>         로그를 파일에도 기록합니다\n\
   --verbosity <수준>   error, warning, info (기본값), verbose 또는 debug\n\
+  --wait <초>          시작할 때 아직 없는 디스크, 볼륨, 이미지와 --listen 주소를\n\
+                       이 시간(초)만큼 기다립니다\n\
+  --skip-unavailable   열 수 없는 대상이 있어도 다른 대상을 제공합니다\n\
+                       (기본값: 아무것도 제공하지 않음)\n\
   --lang <태그>        표시 언어: en-US, ja-JP, zh-CN, zh-TW 또는 ko-KR\n\
                        (기본값: Windows 표시 언어)\n\
   --help               이 도움말을 표시합니다\n\n\
+구성 파일:\n\
+  --config <파일>      서버 옵션, 대상, 디스크를 파일에서 읽습니다. 함께 지정한\n\
+                       서버 옵션이 파일의 설정보다 우선합니다\n\
+  --save-config <파일> 제공하지 않고 대상과 옵션을 파일에 씁니다.\n\
+                       장치는 고정 이름으로 저장됩니다\n\n\
 예:\n\
   TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
-  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n"
+  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n\
+  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n"
     IDS_CLI_LISTENING "{0}:{1}에서 수신 대기 중"
     IDS_CLI_TARGET "대상: {0}"
     IDS_CLI_LUN "  LUN {0}: {1}, {2}{3}"
@@ -86,6 +96,11 @@ VHD 만들기 (디스크도 지정한 경우에만 이어서 서버를 시작합
     IDS_CLI_LIST_NOT_MOUNTED "Windows가 탑재하지 않음, 구성원 디스크에서 직접 제공"
     IDS_CLI_DYNAMIC_VOLUME "동적 볼륨 {0}"
     IDS_CLI_LIST_STABLE_NAMES "    고정 이름: {0}"
+    IDS_CLI_WAITING "대상 {0}의 디스크를 최대 {1}초 동안 기다리는 중..."
+    IDS_CLI_WAITING_ADDRESS "주소 {0}을(를) 최대 {1}초 동안 기다리는 중..."
+    IDS_CLI_TARGET_SKIPPED "대상 {0}은(는) 제공되지 않습니다."
+    IDS_CLI_CONFIG_SAVED "구성을 {0}에 저장했습니다."
+    IDS_CLI_WARN_UNSTABLE "경고: {0}에는 고정 이름이 없습니다. 지정한 그대로 저장되므로 다시 시작한 후 다른 장치를 가리킬 수 있습니다."
     IDS_CLI_LAYOUT_SIMPLE "단순"
     IDS_CLI_LAYOUT_SPANNED "스팬"
     IDS_CLI_LAYOUT_STRIPED "스트라이프"
@@ -130,4 +145,16 @@ VHD 만들기 (디스크도 지정한 경우에만 이어서 서버를 시작합
     IDS_CLI_ERR_INVALID_DEVICE_NAME "잘못된 장치 이름: {0} (--list 참조)"
     IDS_CLI_ERR_NO_SUCH_DEVICE "이름이 '{0}'인 장치가 없습니다 (--list 참조)."
     IDS_CLI_ERR_AMBIGUOUS_DEVICE "이름이 '{0}'인 장치가 여러 개 있습니다. 다른 이름으로 지정하십시오 (--list 참조)."
+    IDS_CLI_ERR_CONFIG_READ "구성 파일 {0}을(를) 읽을 수 없습니다: {1}"
+    IDS_CLI_ERR_CONFIG_LINE "{0}, {1}번째 줄: {2}"
+    IDS_CLI_ERR_CONFIG_FILE "{0}: {1}"
+    IDS_CLI_ERR_CONFIG_MIXED "--config는 --target이나 디스크 옵션과 함께 사용할 수 없습니다. 대상은 구성 파일에 지정하십시오."
+    IDS_CLI_ERR_CONFIG_SAVE "구성 파일 {0}을(를) 쓸 수 없습니다: {1}"
+    IDS_CLI_ERR_CONFIG_NOT_IN_TARGET "{0}은(는) [target <이름>] 섹션에 있어야 합니다."
+    IDS_CLI_ERR_CONFIG_NOT_IN_SERVER "{0}은(는) [server] 섹션에 있어야 합니다."
+    IDS_CLI_ERR_CONFIG_INVALID_LINE "설정이나 섹션이 아닙니다: {0}"
+    IDS_CLI_ERR_CONFIG_UNKNOWN_SECTION "알 수 없는 섹션: {0}"
+    IDS_CLI_ERR_INVALID_WAIT "잘못된 대기 시간: {0} (초 단위, 최대 {1})"
+    IDS_CLI_ERR_INVALID_SWITCH "{0}의 값이 잘못되었습니다: {1} (yes 또는 no 사용)"
+    IDS_CLI_ERR_NOTHING_TO_SERVE "제공할 수 있는 대상이 없습니다."
 END

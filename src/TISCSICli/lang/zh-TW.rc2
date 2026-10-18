@@ -51,12 +51,21 @@ BEGIN
   --port <連接埠>      TCP 連接埠 (預設: 3260)\n\
   --log <檔案>         同時將記錄寫入檔案\n\
   --verbosity <層級>   error、warning、info (預設)、verbose 或 debug\n\
+  --wait <秒數>        啟動時最多等待這麼久，直到尚不存在的磁碟、磁碟區、映像\n\
+                       與 --listen 位址出現\n\
+  --skip-unavailable   某個目標無法開啟時仍提供其他目標 (預設: 都不提供)\n\
   --lang <標記>        介面語言: en-US、ja-JP、zh-CN、zh-TW 或 ko-KR\n\
                        (預設: Windows 顯示語言)\n\
   --help               顯示此說明\n\n\
+設定檔:\n\
+  --config <檔案>      從檔案讀取伺服器選項、目標與磁碟；同時指定的\n\
+                       伺服器選項優先於檔案中的設定\n\
+  --save-config <檔案> 不提供服務，而是將目標與選項寫入檔案；\n\
+                       裝置以固定名稱儲存\n\n\
 範例:\n\
   TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
-  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n"
+  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n\
+  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n"
     IDS_CLI_LISTENING "正在接聽 {0}:{1}"
     IDS_CLI_TARGET "目標: {0}"
     IDS_CLI_LUN "  LUN {0}: {1}，{2}{3}"
@@ -85,6 +94,11 @@ BEGIN
     IDS_CLI_LIST_NOT_MOUNTED "Windows 未掛接；直接從成員磁碟提供"
     IDS_CLI_DYNAMIC_VOLUME "動態磁碟區 {0}"
     IDS_CLI_LIST_STABLE_NAMES "    固定名稱: {0}"
+    IDS_CLI_WAITING "正在等待目標 {0} 的磁碟 (最多 {1} 秒)..."
+    IDS_CLI_WAITING_ADDRESS "正在等待位址 {0} (最多 {1} 秒)..."
+    IDS_CLI_TARGET_SKIPPED "不提供目標 {0}。"
+    IDS_CLI_CONFIG_SAVED "已將設定儲存到 {0}。"
+    IDS_CLI_WARN_UNSTABLE "警告: {0} 沒有固定名稱，將依原樣儲存，重新開機後可能指向其他裝置。"
     IDS_CLI_LAYOUT_SIMPLE "簡單"
     IDS_CLI_LAYOUT_SPANNED "跨距"
     IDS_CLI_LAYOUT_STRIPED "等量"
@@ -129,4 +143,16 @@ BEGIN
     IDS_CLI_ERR_INVALID_DEVICE_NAME "裝置名稱無效: {0} (請參閱 --list)"
     IDS_CLI_ERR_NO_SUCH_DEVICE "沒有名為「{0}」的裝置 (請參閱 --list)。"
     IDS_CLI_ERR_AMBIGUOUS_DEVICE "有多個裝置名為「{0}」，請使用其他名稱 (請參閱 --list)。"
+    IDS_CLI_ERR_CONFIG_READ "無法讀取設定檔 {0}: {1}"
+    IDS_CLI_ERR_CONFIG_LINE "{0} 第 {1} 行: {2}"
+    IDS_CLI_ERR_CONFIG_FILE "{0}: {1}"
+    IDS_CLI_ERR_CONFIG_MIXED "--config 不能與 --target 或磁碟選項合併使用，請將目標寫入設定檔。"
+    IDS_CLI_ERR_CONFIG_SAVE "無法寫入設定檔 {0}: {1}"
+    IDS_CLI_ERR_CONFIG_NOT_IN_TARGET "{0} 必須位於 [target <名稱>] 區段中。"
+    IDS_CLI_ERR_CONFIG_NOT_IN_SERVER "{0} 必須位於 [server] 區段中。"
+    IDS_CLI_ERR_CONFIG_INVALID_LINE "既不是設定也不是區段: {0}"
+    IDS_CLI_ERR_CONFIG_UNKNOWN_SECTION "未知的區段: {0}"
+    IDS_CLI_ERR_INVALID_WAIT "等待時間無效: {0} (以秒為單位，最多 {1})"
+    IDS_CLI_ERR_INVALID_SWITCH "{0} 的值無效: {1} (請使用 yes 或 no)"
+    IDS_CLI_ERR_NOTHING_TO_SERVE "沒有可以提供的目標。"
 END

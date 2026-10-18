@@ -70,7 +70,7 @@ python tests\run_tests.py -k dynamic_volumes
 |------|----------|
 | `src/Common` | Front-end helpers: i18n resource loader, text / error formatting, log file |
 | `src/Core/util` | Byte order, blocking queue, logging, iSCSI key=value text |
-| `src/Core/config` | `ServerConfig` (targets, disks, listening address) shared by the front ends; `OpenDisk` |
+| `src/Core/config` | `ServerConfig` (targets, disks, server options) shared by the front ends; `OpenDisk`, stable names; configuration files |
 | `src/Core/disk` | `Disk` interface, raw / VHD / VMDK / ISO images, RAM disk, `OpenDiskImage`, physical disks, volumes, device enumeration, stable device names (`DeviceSelector`) |
 | `src/Core/ldm` | LDM database parsing, disk groups, `DynamicVolume`, `ListDynamicVolumes` / `OpenDynamicVolume` |
 | `src/Core/scsi` | CDB parsing, SCSI and MMC (CD/DVD) response data, `VirtualScsiTarget`, `SptiTarget` |
@@ -187,6 +187,16 @@ These are deliberate. Don't "fix" them back to the original behavior.
   match exactly one device, and `--list` offers only names that do; serial
   first, since an initiator that repartitions a served disk changes its
   partition table identity. Names are resolved when the disk is opened.
+- Configuration files (`config/ConfigFile.h`) use the CLI option names as
+  keys, and `ConfigBuilder` applies both, so a new server or disk option
+  needs only a key there (plus the usage text). Saving converts device names
+  to stable names (`UseStableName`) and paths to relative ones; loading
+  resolves paths against the file's folder. The GUI keeps a `DiskSpec` per
+  LUN for saving.
+- Startup (CLI): a target opens with all its disks or not at all, so LUN
+  numbers never shift. `--wait` retries failures that may go away
+  (`MayAppearLater`: missing device, volume or file) once a second, and a
+  `WSAEADDRNOTAVAIL` listening address; other errors fail at once.
 - Volumes are served through the OS volume handle, which also covers
   dynamic volumes Windows has mounted.
 - Dynamic volumes: the LDM volume GUID is the Windows volume GUID. A volume

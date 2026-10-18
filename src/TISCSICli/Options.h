@@ -5,12 +5,12 @@
 
 #pragma once
 
+#include "Core/config/ConfigFile.h"
 #include "Core/config/ServerConfig.h"
 
 #include <cstdint>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace tiscsi::cli {
@@ -19,6 +19,11 @@ struct Options {
     config::ServerConfig server;
     bool help = false;
     bool list = false; // --list: show disks, volumes and SCSI devices
+
+    // --config: loaded into `server` before the other options are applied.
+    std::wstring configFile;
+    // --save-config: write `server` there instead of serving.
+    std::wstring saveConfigFile;
 
     // --create-vhd <path> --size <size> [--dynamic]
     std::wstring createVhdPath;
@@ -32,7 +37,6 @@ std::wstring FindLanguageOption(int argc, wchar_t** argv);
 // Returns a localized error message, or std::nullopt on success.
 std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& options);
 
-// "512M", "2G", "1048576" (bytes); binary units K, M, G, T with optional "B"/"iB".
-std::optional<uint64_t> ParseSize(std::wstring_view text);
+std::wstring ConfigErrorMessage(const config::ConfigError& error);
 
 } // namespace tiscsi::cli

@@ -17,8 +17,9 @@
 #include "Options.h"
 #include "resource.h"
 
-#include <windows.h>
+#include <winsock2.h>
 
+#include <algorithm>
 #include <format>
 #include <memory>
 
@@ -293,6 +294,115 @@ bool CreateImage(const cli::Options& options)
     return true;
 }
 
+// --save-config: devices are written by their stable names where they have one.
+int SaveConfig(const cli::Options& options)
+{
+    config::ServerConfig saved = options.server;
+    for (config::TargetSpec& target : saved.targets) {
+        if (!target.sptiDevice.empty() && !config::UseStableSptiName(target.sptiDevice)) {
+            cli::PrintError(i18n::Format(IDS_CLI_WARN_UNSTABLE, target.sptiDevice));
+        }
+        for (config::DiskSpec& disk : target.disks) {
+            if (config::UseStableName(disk, saved.ldmImages)) {
+                continue;
+            }
+            std::wstring description = disk.path;
+            if (disk.kind == config::DiskSpec::Kind::PhysicalDisk) {
+                description = i18n::Format(IDS_CLI_PHYSICAL_DISK, disk.path);
+            } else if (disk.kind == config::DiskSpec::Kind::Volume) {
+                description = i18n::Format(IDS_CLI_VOLUME, disk.path);
+            } else if (disk.kind == config::DiskSpec::Kind::DynamicVolume) {
+                description = i18n::Format(IDS_CLI_DYNAMIC_VOLUME, disk.path);
+            }
+            cli::PrintError(i18n::Format(IDS_CLI_WARN_UNSTABLE, description));
+        }
+    }
+    if (const DWORD error = config::SaveConfigFile(options.saveConfigFile, saved)) {
+        cli::PrintError(i18n::Format(IDS_CLI_ERR_CONFIG_SAVE, options.saveConfigFile, cli::ErrorMessage(error)));
+        return 2;
+    }
+    cli::PrintLine(i18n::Format(IDS_CLI_CONFIG_SAVED, options.saveConfigFile));
+    return 0;
+}
+
+struct LunInfo {
+    std::wstring description;
+    uint64_t size;
+    bool readOnly;
+};
+
+struct OpenedTarget {
+    size_t index; // in ServerConfig::targets
+    std::shared_ptr<iscsi::IscsiTarget> target;
+    std::vector<LunInfo> luns;
+    bool passThrough;
+};
+
+enum class OpenResult { Opened, NotYet, Failed };
+
+// Opens all of a target's disks or none. Without `report`, failures that may
+// go away by themselves are not printed but returned as NotYet.
+OpenResult OpenTarget(const config::TargetSpec& spec, const config::ServerConfig& server,
+                      const std::shared_ptr<const util::LogSink>& sink, bool report, OpenedTarget& opened)
+{
+    std::vector<LunInfo> luns;
+    if (!spec.sptiDevice.empty()) {
+        std::wstring path;
+        disk::OpenError error;
+        if (!config::ResolveSptiDevice(spec.sptiDevice, path, error)) {
+            if (!report && config::MayAppearLater(error)) {
+                return OpenResult::NotYet;
+            }
+            PrintOpenError(error, true);
+            return OpenResult::Failed;
+        }
+        DWORD code = 0;
+        auto spti = scsi::SptiTarget::Open(path, util::Logger("SPTI Target", sink), code);
+        if (!spti) {
+            error.Set(code, path);
+            if (!report && config::MayAppearLater(error)) {
+                return OpenResult::NotYet;
+            }
+            cli::PrintError(i18n::Format(IDS_CLI_ERR_OPEN_SPTI, path, cli::ErrorMessage(code)));
+            PrintAdminHint(code);
+            return OpenResult::Failed;
+        }
+        const std::wstring device = path == spec.sptiDevice ? path : std::format(L"{} ({})", spec.sptiDevice, path);
+        luns.push_back({i18n::Format(IDS_CLI_SPTI, device, spti->LunCount()), 0, false});
+        opened.target = std::make_shared<iscsi::IscsiTarget>(spec.name, std::move(spti));
+        opened.luns = std::move(luns);
+        opened.passThrough = true;
+        return OpenResult::Opened;
+    }
+
+    std::vector<std::unique_ptr<disk::Disk>> disks;
+    for (const config::DiskSpec& diskSpec : spec.disks) {
+        disk::OpenError error;
+        std::unique_ptr<disk::Disk> disk = config::OpenDisk(diskSpec, server.ldmImages, error);
+        if (!disk) {
+            if (diskSpec.kind == config::DiskSpec::Kind::RamDisk) {
+                cli::PrintError(i18n::Format(IDS_CLI_ERR_RAM_ALLOC, cli::FormatSize(diskSpec.size)));
+                return OpenResult::Failed;
+            }
+            if (!report && config::MayAppearLater(error)) {
+                return OpenResult::NotYet; // the disks opened so far are released
+            }
+            PrintOpenError(error, diskSpec.kind != config::DiskSpec::Kind::Image);
+            return OpenResult::Failed;
+        }
+        luns.push_back({LunDescription(diskSpec, *disk), disk->Size(), disk->IsReadOnly()});
+        disks.push_back(std::move(disk));
+    }
+    opened.target = std::make_shared<iscsi::IscsiTarget>(spec.name, std::move(disks),
+                                                         util::Logger("Virtual SCSI Target", sink));
+    opened.luns = std::move(luns);
+    opened.passThrough = false;
+    return OpenResult::Opened;
+}
+
+// Waits a second between attempts; false if Ctrl+C was pressed meanwhile.
+bool WaitBeforeRetry() { return WaitForSingleObject(g_stopEvent, 1000) == WAIT_TIMEOUT; }
+
 int Run(const cli::Options& options)
 {
     if (!options.createVhdPath.empty()) {
@@ -302,6 +412,9 @@ int Run(const cli::Options& options)
         if (options.server.targets.empty()) {
             return 0;
         }
+    }
+    if (!options.saveConfigFile.empty()) {
+        return SaveConfig(options);
     }
 
     LogWriter logWriter(options.server.verbosity);
@@ -316,76 +429,90 @@ int Run(const cli::Options& options)
             logWriter.Write(severity, source, message);
         });
 
-    // Open every disk before starting, so a typo does not leave a half-started server.
-    struct LunInfo {
-        std::wstring description;
-        uint64_t size;
-        bool readOnly;
-    };
-    std::vector<std::shared_ptr<iscsi::IscsiTarget>> targets;
-    std::vector<std::vector<LunInfo>> lunInfo;
-    for (const config::TargetSpec& spec : options.server.targets) {
-        std::vector<LunInfo> infos;
-        if (!spec.sptiDevice.empty()) {
-            std::wstring path;
-            disk::OpenError resolveError;
-            if (!config::ResolveSptiDevice(spec.sptiDevice, path, resolveError)) {
-                PrintOpenError(resolveError, true);
-                return 2;
-            }
-            DWORD error = 0;
-            auto spti = scsi::SptiTarget::Open(path, util::Logger("SPTI Target", sink), error);
-            if (!spti) {
-                cli::PrintError(i18n::Format(IDS_CLI_ERR_OPEN_SPTI, path, cli::ErrorMessage(error)));
-                PrintAdminHint(error);
-                return 2;
-            }
-            const std::wstring device = path == spec.sptiDevice ? path : std::format(L"{} ({})", spec.sptiDevice, path);
-            infos.push_back({i18n::Format(IDS_CLI_SPTI, device, spti->LunCount()), 0, false});
-            targets.push_back(std::make_shared<iscsi::IscsiTarget>(spec.name, std::move(spti)));
-            lunInfo.push_back(std::move(infos));
-            continue;
-        }
-
-        std::vector<std::unique_ptr<disk::Disk>> disks;
-        for (const config::DiskSpec& diskSpec : spec.disks) {
-            disk::OpenError error;
-            std::unique_ptr<disk::Disk> disk = config::OpenDisk(diskSpec, options.server.ldmImages, error);
-            if (!disk) {
-                if (diskSpec.kind == config::DiskSpec::Kind::RamDisk) {
-                    cli::PrintError(i18n::Format(IDS_CLI_ERR_RAM_ALLOC, cli::FormatSize(diskSpec.size)));
-                } else {
-                    PrintOpenError(error, diskSpec.kind != config::DiskSpec::Kind::Image);
+    // Open every disk before starting, so a typo does not leave a half-started
+    // server. Devices and files that are not there yet are waited for.
+    const DWORD start = GetTickCount();
+    const DWORD waitMs = options.server.waitSeconds * 1000;
+    auto timeLeft = [&] { return GetTickCount() - start < waitMs; };
+    std::vector<OpenedTarget> opened;
+    std::vector<size_t> pending;
+    for (size_t i = 0; i < options.server.targets.size(); ++i) {
+        pending.push_back(i);
+    }
+    std::vector<bool> announced(options.server.targets.size(), false);
+    while (!pending.empty()) {
+        const bool last = !timeLeft();
+        std::vector<size_t> stillPending;
+        for (size_t index : pending) {
+            const config::TargetSpec& spec = options.server.targets[index];
+            OpenedTarget target{index, nullptr, {}, false};
+            switch (OpenTarget(spec, options.server, sink, last, target)) {
+            case OpenResult::Opened:
+                opened.push_back(std::move(target));
+                break;
+            case OpenResult::NotYet:
+                if (!announced[index]) {
+                    announced[index] = true;
+                    cli::PrintLine(i18n::Format(IDS_CLI_WAITING, cli::Utf8ToWide(spec.name), options.server.waitSeconds));
                 }
-                return 2;
+                stillPending.push_back(index);
+                break;
+            case OpenResult::Failed:
+                if (!options.server.skipUnavailable) {
+                    return 2;
+                }
+                cli::PrintError(i18n::Format(IDS_CLI_TARGET_SKIPPED, cli::Utf8ToWide(spec.name)));
+                break;
             }
-            infos.push_back({LunDescription(diskSpec, *disk), disk->Size(), disk->IsReadOnly()});
-            disks.push_back(std::move(disk));
         }
-        targets.push_back(std::make_shared<iscsi::IscsiTarget>(spec.name, std::move(disks),
-                                                               util::Logger("Virtual SCSI Target", sink)));
-        lunInfo.push_back(std::move(infos));
+        pending = std::move(stillPending);
+        if (!pending.empty() && !WaitBeforeRetry()) {
+            cli::PrintLine(i18n::Str(IDS_CLI_STOPPED));
+            return 2;
+        }
     }
-
-    // Declared after `targets` so it is destroyed (and stopped) first.
-    iscsi::IscsiServer server(util::Logger("iSCSI Server", sink));
-    for (const auto& target : targets) {
-        server.AddTarget(target);
-    }
-    if (const int error = server.Start(options.server.address, options.server.port)) {
-        cli::PrintError(i18n::Format(IDS_CLI_ERR_START, cli::ErrorMessage(static_cast<unsigned long>(error))));
+    if (opened.empty()) {
+        cli::PrintError(i18n::Str(IDS_CLI_ERR_NOTHING_TO_SERVE));
         return 2;
+    }
+    std::sort(opened.begin(), opened.end(),
+              [](const OpenedTarget& a, const OpenedTarget& b) { return a.index < b.index; });
+
+    // Declared after `opened` so it is destroyed (and stopped) first.
+    iscsi::IscsiServer server(util::Logger("iSCSI Server", sink));
+    for (const OpenedTarget& target : opened) {
+        server.AddTarget(target.target);
+    }
+    bool announcedAddress = false;
+    for (;;) {
+        const int error = server.Start(options.server.address, options.server.port);
+        if (error == 0) {
+            break;
+        }
+        // The address may come later (DHCP, a network adapter starting).
+        if (error != WSAEADDRNOTAVAIL || !timeLeft()) {
+            cli::PrintError(i18n::Format(IDS_CLI_ERR_START, cli::ErrorMessage(static_cast<unsigned long>(error))));
+            return 2;
+        }
+        if (!announcedAddress) {
+            announcedAddress = true;
+            cli::PrintLine(i18n::Format(IDS_CLI_WAITING_ADDRESS, options.server.addressText, options.server.waitSeconds));
+        }
+        if (!WaitBeforeRetry()) {
+            cli::PrintLine(i18n::Str(IDS_CLI_STOPPED));
+            return 2;
+        }
     }
 
     cli::PrintLine(i18n::Format(IDS_CLI_LISTENING, options.server.addressText, options.server.port));
-    for (size_t t = 0; t < targets.size(); ++t) {
-        cli::PrintLine(i18n::Format(IDS_CLI_TARGET, cli::Utf8ToWide(targets[t]->Name())));
-        if (!options.server.targets[t].sptiDevice.empty()) {
-            cli::PrintLine(lunInfo[t].front().description);
+    for (const OpenedTarget& target : opened) {
+        cli::PrintLine(i18n::Format(IDS_CLI_TARGET, cli::Utf8ToWide(target.target->Name())));
+        if (target.passThrough) {
+            cli::PrintLine(target.luns.front().description);
             continue;
         }
-        for (size_t lun = 0; lun < lunInfo[t].size(); ++lun) {
-            const LunInfo& info = lunInfo[t][lun];
+        for (size_t lun = 0; lun < target.luns.size(); ++lun) {
+            const LunInfo& info = target.luns[lun];
             cli::PrintLine(i18n::Format(IDS_CLI_LUN, lun, info.description, cli::FormatSize(info.size),
                                         info.readOnly ? i18n::Str(IDS_CLI_READ_ONLY) : std::wstring()));
         }

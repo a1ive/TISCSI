@@ -387,4 +387,6 @@ std::unique_ptr<disk::Disk> OpenDynamicVolume(const std::wstring& id, bool readO
     return nullptr;
 }
 
+std::optional<Guid> ParseDynamicVolumeGuid(const std::wstring& id) { return ParseVolumeGuid(id); }
+
 } // namespace tiscsi::ldm

@@ -54,12 +54,22 @@ Server:\n\
   --port <port>        TCP port (default: 3260)\n\
   --log <file>         Also write the log to a file\n\
   --verbosity <level>  error, warning, info (default), verbose or debug\n\
+  --wait <seconds>     At startup, wait this long for disks, volumes, images\n\
+                       and the --listen address that are not there yet\n\
+  --skip-unavailable   Serve the other targets when one cannot be opened\n\
+                       (default: serve none)\n\
   --lang <tag>         Language: en-US, ja-JP, zh-CN, zh-TW\n\
                        or ko-KR (default: Windows language)\n\
   --help               Show this help\n\n\
+Configuration files:\n\
+  --config <file>      Read the server options, targets and disks from a file;\n\
+                       server options given as well override the file's\n\
+  --save-config <file> Write the targets and options to a file instead of\n\
+                       serving; devices are saved by their stable names\n\n\
 Example:\n\
   TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
-  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n"
+  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n\
+  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n"
     IDS_CLI_LISTENING "Listening on {0}:{1}"
     IDS_CLI_TARGET "Target: {0}"
     IDS_CLI_LUN "  LUN {0}: {1}, {2}{3}"
@@ -88,6 +98,11 @@ Example:\n\
     IDS_CLI_LIST_NOT_MOUNTED "Not mounted by Windows; served from the member disks"
     IDS_CLI_DYNAMIC_VOLUME "Dynamic volume {0}"
     IDS_CLI_LIST_STABLE_NAMES "    stable names: {0}"
+    IDS_CLI_WAITING "Waiting up to {1} s for the disks of {0}..."
+    IDS_CLI_WAITING_ADDRESS "Waiting up to {1} s for the address {0}..."
+    IDS_CLI_TARGET_SKIPPED "Target {0} is not served."
+    IDS_CLI_CONFIG_SAVED "Saved the configuration to {0}."
+    IDS_CLI_WARN_UNSTABLE "Warning: {0} has no stable name. It is saved as given and may refer to another device after a restart."
     IDS_CLI_LAYOUT_SIMPLE "simple"
     IDS_CLI_LAYOUT_SPANNED "spanned"
     IDS_CLI_LAYOUT_STRIPED "striped"
@@ -132,4 +147,16 @@ Example:\n\
     IDS_CLI_ERR_INVALID_DEVICE_NAME "Invalid device name: {0} (see --list)"
     IDS_CLI_ERR_NO_SUCH_DEVICE "No device has the name ""{0}"" (see --list)."
     IDS_CLI_ERR_AMBIGUOUS_DEVICE "More than one device has the name ""{0}""; use another of its names (see --list)."
+    IDS_CLI_ERR_CONFIG_READ "Cannot read the configuration file {0}: {1}"
+    IDS_CLI_ERR_CONFIG_LINE "{0}, line {1}: {2}"
+    IDS_CLI_ERR_CONFIG_FILE "{0}: {1}"
+    IDS_CLI_ERR_CONFIG_MIXED "--config cannot be combined with --target or disk options; put the targets in the configuration file."
+    IDS_CLI_ERR_CONFIG_SAVE "Cannot write the configuration file {0}: {1}"
+    IDS_CLI_ERR_CONFIG_NOT_IN_TARGET "{0} must be in a [target <name>] section."
+    IDS_CLI_ERR_CONFIG_NOT_IN_SERVER "{0} must be in the [server] section."
+    IDS_CLI_ERR_CONFIG_INVALID_LINE "Not a setting or a section: {0}"
+    IDS_CLI_ERR_CONFIG_UNKNOWN_SECTION "Unknown section: {0}"
+    IDS_CLI_ERR_INVALID_WAIT "Invalid waiting time: {0} (seconds, at most {1})"
+    IDS_CLI_ERR_INVALID_SWITCH "Invalid value for {0}: {1} (use yes or no)"
+    IDS_CLI_ERR_NOTHING_TO_SERVE "None of the targets can be served."
 END
