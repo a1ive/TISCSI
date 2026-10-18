@@ -3,6 +3,7 @@
 
 #include "Core/disk/DiskImage.h"
 
+#include "Core/disk/IsoImage.h"
 #include "Core/disk/RawDiskImage.h"
 #include "Core/disk/Vhd.h"
 #include "Core/disk/Vmdk.h"
@@ -34,6 +35,9 @@ std::unique_ptr<Disk> detail::OpenDiskImage(const std::wstring& path, bool readO
     }
     if (HasExtension(path, L".vmdk")) {
         return VmdkDisk::Open(path, readOnly, error, depth);
+    }
+    if (HasExtension(path, L".iso")) {
+        return IsoImage::Open(path, error); // read-only whatever was asked
     }
     return RawDiskImage::Open(path, readOnly, error);
 }

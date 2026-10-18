@@ -4,7 +4,9 @@
 //
 // Ported from iSCSI Console (ISCSI/SCSI/SCSICommandDescriptorBlock).
 // The C# class hierarchy (6/10/12/16-byte CDBs, Inquiry, Mode Sense) is
-// flattened into one decoded structure.
+// flattened into one decoded structure. Of the MMC (CD/DVD) commands only the
+// allocation length is decoded; their handlers read the other fields from the
+// CDB bytes.
 
 #pragma once
 
@@ -21,7 +23,8 @@ struct Cdb {
     ServiceAction serviceAction = ServiceAction::None;
     uint64_t logicalBlockAddress = 0;
     // Number of blocks for READ/WRITE/VERIFY; allocation length for
-    // INQUIRY, MODE SENSE, REQUEST SENSE, REPORT LUNS, READ CAPACITY (16).
+    // INQUIRY, MODE SENSE, REQUEST SENSE, REPORT LUNS, READ CAPACITY (16)
+    // and the MMC commands.
     uint32_t transferLength = 0;
     uint8_t control = 0;
 
@@ -29,7 +32,7 @@ struct Cdb {
     bool evpd = false;
     VpdPage pageCode = VpdPage::SupportedVpdPages;
 
-    // MODE SENSE (6)
+    // MODE SENSE (6) / (10)
     bool disableBlockDescriptors = false;
     uint8_t pageControl = 0;
     ModePageCode modePageCode = ModePageCode::VendorSpecific;

@@ -27,6 +27,8 @@ public:
     virtual uint32_t BytesPerSector() const = 0;
     virtual uint64_t Size() const = 0; // in bytes, a multiple of BytesPerSector()
     virtual bool IsReadOnly() const = 0;
+    // Served as a CD/DVD-ROM drive (MMC) instead of a direct-access block device.
+    virtual bool IsOpticalDisc() const { return false; }
     // Short human-readable description for logs and UI (path, "RAM disk", ...).
     virtual std::wstring Description() const = 0;
 

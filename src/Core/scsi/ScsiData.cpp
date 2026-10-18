@@ -197,6 +197,20 @@ Bytes ModeParameterHeader6(uint8_t modeDataLength, bool writeProtect, bool dpoFu
     return b;
 }
 
+Bytes ModeParameterHeader10(uint16_t modeDataLength, bool writeProtect, bool dpoFua, uint16_t blockDescriptorLength)
+{
+    Bytes b(8, 0);
+    WriteBE16(&b[0], modeDataLength);
+    if (writeProtect) {
+        b[3] |= 0x80;
+    }
+    if (dpoFua) {
+        b[3] |= 0x10;
+    }
+    WriteBE16(&b[6], blockDescriptorLength);
+    return b;
+}
+
 Bytes ShortLbaBlockDescriptor(uint32_t numberOfBlocks, uint32_t logicalBlockLength)
 {
     Bytes b(8, 0);

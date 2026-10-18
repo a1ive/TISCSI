@@ -2,7 +2,8 @@
 // Copyright (C) 2026 A1ive
 //
 // Opens a disk image file by extension, like DiskAccessLibrary's
-// DiskImage.GetDiskImage: .vhd, .vmdk, anything else is a raw image.
+// DiskImage.GetDiskImage: .vhd, .vmdk, .iso (a CD/DVD-ROM disc), anything
+// else is a raw image.
 
 #pragma once
 
@@ -44,7 +45,7 @@ struct OpenError {
 };
 
 // Read-write images are opened exclusively; parents of differencing images
-// are always opened read-only (shared).
+// and .iso images are always opened read-only (shared).
 std::unique_ptr<Disk> OpenDiskImage(const std::wstring& path, bool readOnly, OpenError& error);
 
 namespace detail {

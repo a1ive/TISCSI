@@ -56,6 +56,7 @@
     <ClInclude Include="disk\DiskImage.h" />
     <ClInclude Include="disk\File.h" />
     <ClInclude Include="disk\RawDiskImage.h" />
+    <ClInclude Include="disk\IsoImage.h" />
     <ClInclude Include="disk\RamDisk.h" />
     <ClInclude Include="ldm\LdmDatabase.h" />
     <ClInclude Include="ldm\DiskGroup.h" />
@@ -65,6 +66,7 @@
     <ClInclude Include="scsi\ScsiTypes.h" />
     <ClInclude Include="scsi\Cdb.h" />
     <ClInclude Include="scsi\ScsiData.h" />
+    <ClInclude Include="scsi\MmcData.h" />
     <ClInclude Include="scsi\ScsiTarget.h" />
     <ClInclude Include="scsi\VirtualScsiTarget.h" />
     <ClInclude Include="iscsi\Pdu.h" />
@@ -93,6 +95,7 @@
     <ClCompile Include="ldm\DynamicVolumes.cpp" />
     <ClCompile Include="scsi\Cdb.cpp" />
     <ClCompile Include="scsi\ScsiData.cpp" />
+    <ClCompile Include="scsi\MmcData.cpp" />
     <ClCompile Include="scsi\ScsiTarget.cpp" />
     <ClCompile Include="scsi\VirtualScsiTarget.cpp" />
     <ClCompile Include="iscsi\Pdu.cpp" />

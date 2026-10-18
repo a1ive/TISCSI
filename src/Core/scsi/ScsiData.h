@@ -32,6 +32,7 @@ struct SenseData {
     static SenseData LbaOutOfRange() { return IllegalRequest(0x21); }
     static SenseData InvalidFieldInCdb() { return IllegalRequest(0x24); }
     static SenseData InvalidLun() { return IllegalRequest(0x25); }
+    static SenseData IncompatibleMediumFormat() { return IllegalRequest(0x30, 0x02); } // e.g. DVD request, CD
     static SenseData DataProtect() { return {0x07, 0x27, 0x00}; }          // write protected
     static SenseData UnrecoveredReadError() { return {0x03, 0x11, 0x00}; } // medium error
     static SenseData WriteFault() { return {0x03, 0x03, 0x00}; }           // medium error
@@ -94,6 +95,7 @@ Bytes PowerConditionModePage();
 Bytes PowerConsumptionModePage();
 Bytes InformationalExceptionsControlModePage();
 Bytes ModeParameterHeader6(uint8_t modeDataLength, bool writeProtect, bool dpoFua, uint8_t blockDescriptorLength);
+Bytes ModeParameterHeader10(uint16_t modeDataLength, bool writeProtect, bool dpoFua, uint16_t blockDescriptorLength);
 Bytes ShortLbaBlockDescriptor(uint32_t numberOfBlocks, uint32_t logicalBlockLength);
 
 // Capacity and LUN inventory

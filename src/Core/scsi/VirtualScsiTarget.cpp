@@ -4,6 +4,9 @@
 
 #include "Core/scsi/VirtualScsiTarget.h"
 
+#include "Core/scsi/MmcData.h"
+#include "Core/util/ByteOrder.h"
+
 #include <algorithm>
 #include <format>
 
@@ -80,16 +83,19 @@ ScsiStatus VirtualScsiTarget::ExecuteCommand(const CdbBytes& cdbBytes, const Lun
     case op::Inquiry:
         return Inquiry(cdb, lun, response);
     case op::ModeSense6:
-        return ModeSense6(cdb, lun, response);
+    case op::ModeSense10:
+        return ModeSense(cdb, lun, response);
     case op::ReadCapacity10:
         response = ReadCapacity10Data(disk.Size(), disk.BytesPerSector());
         return ScsiStatus::Good;
     case op::Read6:
     case op::Read10:
+    case op::Read12:
     case op::Read16:
         return Read(cdb, lun, response);
     case op::Write6:
     case op::Write10:
+    case op::Write12:
     case op::Write16:
         return Write(cdb, lun, data, response);
     case op::SynchronizeCache10:
@@ -101,6 +107,9 @@ ScsiStatus VirtualScsiTarget::ExecuteCommand(const CdbBytes& cdbBytes, const Lun
             return ScsiStatus::Good;
         }
         break;
+    }
+    if (disk.IsOpticalDisc()) {
+        return ExecuteMmcCommand(cdb, cdbBytes, lun, response);
     }
     m_log.Log(Severity::Error, "Unsupported SCSI Command (0x{:X})", cdb.opcode);
     return CheckCondition(response, SenseData::UnsupportedCommand());
@@ -114,9 +123,15 @@ ScsiStatus VirtualScsiTarget::Inquiry(const Cdb& cdb, uint16_t lun, Bytes& respo
             return CheckCondition(response, SenseData::InvalidFieldInCdb());
         }
         StandardInquiryData inquiry;
-        inquiry.peripheralDeviceType = PeripheralDeviceType::DirectAccessBlockDevice;
+        if (m_disks[lun]->IsOpticalDisc()) {
+            inquiry.peripheralDeviceType = PeripheralDeviceType::CdRomDevice;
+            inquiry.removable = true;
+            inquiry.productIdentification = std::format("SCSI DVD-ROM {}", lun);
+        } else {
+            inquiry.peripheralDeviceType = PeripheralDeviceType::DirectAccessBlockDevice;
+            inquiry.productIdentification = std::format("SCSI Disk {}", lun);
+        }
         inquiry.vendorIdentification = "TISCSI";
-        inquiry.productIdentification = std::format("SCSI Disk {}", lun);
         inquiry.productRevisionLevel = "1.00";
         inquiry.cmdQue = true;
         inquiry.version = 5; // SPC-3
@@ -126,6 +141,12 @@ ScsiStatus VirtualScsiTarget::Inquiry(const Cdb& cdb, uint16_t lun, Bytes& respo
         response = inquiry.GetBytes();
     } else {
         m_log.Log(Severity::Verbose, "Inquiry: Page code: 0x{:X}", static_cast<uint8_t>(cdb.pageCode));
+        if (m_disks[lun]->IsOpticalDisc() &&
+            (cdb.pageCode == VpdPage::BlockLimits || cdb.pageCode == VpdPage::BlockDeviceCharacteristics)) {
+            m_log.Log(Severity::Error, "Inquiry: VPD page 0x{:X} is only provided by block devices",
+                      static_cast<uint8_t>(cdb.pageCode));
+            return CheckCondition(response, SenseData::InvalidFieldInCdb());
+        }
         switch (cdb.pageCode) {
         case VpdPage::SupportedVpdPages:
             response = SupportedVpdPages({static_cast<uint8_t>(VpdPage::SupportedVpdPages),
@@ -166,11 +187,42 @@ ScsiStatus VirtualScsiTarget::Inquiry(const Cdb& cdb, uint16_t lun, Bytes& respo
     return ScsiStatus::Good;
 }
 
-ScsiStatus VirtualScsiTarget::ModeSense6(const Cdb& cdb, uint16_t lun, Bytes& response)
+ScsiStatus VirtualScsiTarget::ModeSense(const Cdb& cdb, uint16_t lun, Bytes& response)
 {
-    m_log.Log(Severity::Verbose, "ModeSense6: Page code: 0x{:X}, Sub page code: 0x{:X}",
+    const bool modeSense10 = cdb.opcode == op::ModeSense10;
+    m_log.Log(Severity::Verbose, "ModeSense{}: Page code: 0x{:X}, Sub page code: 0x{:X}", modeSense10 ? 10 : 6,
               static_cast<uint8_t>(cdb.modePageCode), cdb.subpageCode);
+    const disk::Disk& disk = *m_disks[lun];
+    const bool optical = disk.IsOpticalDisc();
     Bytes pages;
+    if (!(optical ? MmcModePages(cdb, pages) : DiskModePages(cdb, pages))) {
+        return CheckCondition(response, SenseData::InvalidFieldInCdb());
+    }
+
+    // MMC drives have neither block descriptors nor a device-specific parameter.
+    Bytes descriptor;
+    if (!cdb.disableBlockDescriptors && !optical) {
+        descriptor = ShortLbaBlockDescriptor(0, disk.BytesPerSector());
+    }
+    // Even with WP set, Windows does not always prevent writes; Write() enforces it.
+    const bool writeProtect = !optical && disk.IsReadOnly();
+    if (modeSense10) {
+        const auto modeDataLength = static_cast<uint16_t>(6 + descriptor.size() + pages.size());
+        response = ModeParameterHeader10(modeDataLength, writeProtect, !optical,
+                                         static_cast<uint16_t>(descriptor.size()));
+    } else {
+        const auto modeDataLength = static_cast<uint8_t>(3 + descriptor.size() + pages.size());
+        response = ModeParameterHeader6(modeDataLength, writeProtect, !optical,
+                                        static_cast<uint8_t>(descriptor.size()));
+    }
+    response.insert(response.end(), descriptor.begin(), descriptor.end());
+    response.insert(response.end(), pages.begin(), pages.end());
+    TruncateTo(response, cdb.transferLength);
+    return ScsiStatus::Good;
+}
+
+bool VirtualScsiTarget::DiskModePages(const Cdb& cdb, Bytes& pages)
+{
     switch (cdb.modePageCode) {
     case ModePageCode::CachingParameters:
         pages = CachingParametersPage(true);
@@ -184,9 +236,9 @@ ScsiStatus VirtualScsiTarget::ModeSense6(const Cdb& cdb, uint16_t lun, Bytes& re
         } else if (cdb.subpageCode == 0x01) {
             pages = PowerConsumptionModePage();
         } else {
-            m_log.Log(Severity::Error, "ModeSense6: Power condition subpage 0x{:x} is not implemented",
+            m_log.Log(Severity::Error, "ModeSense: Power condition subpage 0x{:x} is not implemented",
                       cdb.subpageCode);
-            return CheckCondition(response, SenseData::InvalidFieldInCdb());
+            return false;
         }
         break;
     case ModePageCode::InformationalExceptionsControl:
@@ -202,23 +254,36 @@ ScsiStatus VirtualScsiTarget::ModeSense6(const Cdb& cdb, uint16_t lun, Bytes& re
         // Windows 2000 requests this page; Microsoft iSCSI Target returns it empty.
         break;
     default:
-        m_log.Log(Severity::Error, "ModeSense6: ModeSense6 page 0x{:x} is not implemented",
+        m_log.Log(Severity::Error, "ModeSense: page 0x{:x} is not implemented",
                   static_cast<uint8_t>(cdb.modePageCode));
-        return CheckCondition(response, SenseData::InvalidFieldInCdb());
+        return false;
     }
+    return true;
+}
 
-    const disk::Disk& disk = *m_disks[lun];
-    Bytes descriptor;
-    if (!cdb.disableBlockDescriptors) {
-        descriptor = ShortLbaBlockDescriptor(0, disk.BytesPerSector());
+bool VirtualScsiTarget::MmcModePages(const Cdb& cdb, Bytes& pages)
+{
+    switch (cdb.modePageCode) {
+    case ModePageCode::ReadWriteErrorRecovery:
+        pages = ReadWriteErrorRecoveryModePage();
+        break;
+    case ModePageCode::MmCapabilities:
+        pages = MmCapabilitiesModePage();
+        break;
+    case ModePageCode::ReturnAllPages: {
+        pages = ReadWriteErrorRecoveryModePage();
+        const Bytes capabilities = MmCapabilitiesModePage();
+        pages.insert(pages.end(), capabilities.begin(), capabilities.end());
+        break;
     }
-    const auto modeDataLength = static_cast<uint8_t>(3 + descriptor.size() + pages.size());
-    // Even with WP set, Windows does not always prevent writes; Write() enforces it.
-    response = ModeParameterHeader6(modeDataLength, disk.IsReadOnly(), true, static_cast<uint8_t>(descriptor.size()));
-    response.insert(response.end(), descriptor.begin(), descriptor.end());
-    response.insert(response.end(), pages.begin(), pages.end());
-    TruncateTo(response, cdb.transferLength);
-    return ScsiStatus::Good;
+    case ModePageCode::VendorSpecific:
+        break;
+    default:
+        m_log.Log(Severity::Error, "ModeSense: page 0x{:x} is not implemented for a CD/DVD-ROM drive",
+                  static_cast<uint8_t>(cdb.modePageCode));
+        return false;
+    }
+    return true;
 }
 
 ScsiStatus VirtualScsiTarget::Read(const Cdb& cdb, uint16_t lun, Bytes& response)
@@ -275,6 +340,68 @@ ScsiStatus VirtualScsiTarget::SynchronizeCache(uint16_t lun, Bytes& response)
         m_log.Write(Severity::Error, "Synchronize cache error: I/O failure");
         return CheckCondition(response, SenseData::WriteFault());
     }
+    return ScsiStatus::Good;
+}
+
+ScsiStatus VirtualScsiTarget::ExecuteMmcCommand(const Cdb& cdb, const CdbBytes& cdbBytes, uint16_t lun,
+                                                Bytes& response)
+{
+    const uint8_t* b = cdbBytes.data();
+    const uint64_t sectors = m_disks[lun]->TotalSectors();
+    const MmcProfile profile = ProfileForDisc(sectors);
+    std::optional<Bytes> data;
+    switch (cdb.opcode) {
+    case op::StartStopUnit: // the disc stays in the drive
+    case op::PreventAllowMediumRemoval:
+    case op::SetCdSpeed:
+        return ScsiStatus::Good;
+    case op::ReadToc: {
+        uint8_t format = b[2] & 0x0F;
+        if (format == 0) {
+            format = b[9] >> 6; // older (SFF-8020) position, which Windows still uses for some requests
+        }
+        data = TocData(sectors, format, (b[1] & 0x02) != 0, b[6]);
+        break;
+    }
+    case op::GetConfiguration:
+        data = ConfigurationData(profile, b[1] & 0x03, util::ReadBE16(b + 2));
+        break;
+    case op::GetEventStatusNotification:
+        if (b[1] & 0x01) { // asynchronous notification is not supported
+            data = EventStatusData(b[4]);
+        }
+        break;
+    case op::ReadDiscInformation:
+        if ((b[1] & 0x07) == 0) { // the other data types are for BD
+            data = DiscInformationData();
+        }
+        break;
+    case op::ReadTrackInformation:
+        data = TrackInformationData(sectors, b[1] & 0x03, util::ReadBE32(b + 2));
+        break;
+    case op::ReadDvdStructure:
+        if ((b[1] & 0x0F) != 0) { // BD media type
+            break;
+        }
+        if (b[7] != 0xFF && profile == MmcProfile::CdRom) {
+            m_log.Log(Severity::Verbose, "LUN {}: READ DVD STRUCTURE on a CD", lun);
+            return CheckCondition(response, SenseData::IncompatibleMediumFormat());
+        }
+        data = DvdStructureData(sectors, b[7], b[6]);
+        break;
+    case op::MechanismStatus:
+        data = MechanismStatusData();
+        break;
+    default:
+        m_log.Log(Severity::Error, "Unsupported SCSI Command (0x{:X})", cdb.opcode);
+        return CheckCondition(response, SenseData::UnsupportedCommand());
+    }
+    if (!data) {
+        m_log.Log(Severity::Warning, "Initiator error: invalid field in MMC command 0x{:02X}", cdb.opcode);
+        return CheckCondition(response, SenseData::InvalidFieldInCdb());
+    }
+    response = std::move(*data);
+    TruncateTo(response, cdb.transferLength);
     return ScsiStatus::Good;
 }
 

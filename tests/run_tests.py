@@ -20,6 +20,7 @@ import time
 import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import iso_tool  # noqa: E402
 import ldm_tool  # noqa: E402
 import vhd_tool  # noqa: E402
 from initiator import Session, asc, cdb10, cdb16, sense_key  # noqa: E402
@@ -511,6 +512,268 @@ def test_image_formats_vmware(ctx):
     run_tool(VDISKMANAGER, "-q", "-c", "-s", "16MB", "-a", "lsilogic", "-t", "5", stream)
     rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), "--image-ro", stream)
     ctx.check(rc == 2 and "not supported" in out, "VMware streamOptimized VMDK is refused as unsupported")
+
+
+# ---- Optical disc images (.iso) ---------------------------------------------
+
+CD_SECTORS = 1000
+DVD_SECTORS = 80 * 60 * 75 + 1  # one sector more than an 80-minute CD
+
+
+def make_sparse(path, size):
+    """Makes `path` a sparse file of `size` bytes, creating it if needed (no
+    administrator rights needed)."""
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+    with open(path, "r+b" if os.path.exists(path) else "wb") as f:
+        handle = msvcrt.get_osfhandle(f.fileno())
+        returned = wintypes.DWORD()
+        FSCTL_SET_SPARSE = 0x900C4
+        ctypes.windll.kernel32.DeviceIoControl(wintypes.HANDLE(handle), FSCTL_SET_SPARSE, None, 0, None, 0,
+                                               ctypes.byref(returned), None)
+        f.truncate(size)
+    return path
+
+
+def make_iso(ctx, name, sectors):
+    """Image of `sectors` 2048-byte sectors with an ISO 9660 volume descriptor
+    at sector 16, plus a partial trailing sector that must be ignored."""
+    content = bytearray(os.urandom(sectors * 2048 + 100))
+    content[16 * 2048:16 * 2048 + 6] = b"\x01CD001"
+    path = ctx.path(name)
+    with open(path, "wb") as f:
+        f.write(content)
+    return path, bytes(content[:sectors * 2048])
+
+
+def msf(lba):
+    frames = lba + 150
+    return bytes([frames // 4500, frames // 75 % 60, frames % 75])
+
+
+def mmc_cdb(opcode, byte1=0, byte2=0, byte6=0, alloc=0xFFFF, byte9=0):
+    return bytes([opcode, byte1, byte2, 0, 0, 0, byte6]) + struct.pack(">H", alloc) + bytes([byte9])
+
+
+def feature_codes(data):
+    codes = []
+    pos = 8
+    while pos + 4 <= len(data):
+        codes.append(struct.unpack(">H", data[pos:pos + 2])[0])
+        pos += 4 + data[pos + 3]
+    return codes
+
+
+def mode_pages(data, header_length):
+    """Page codes of a MODE SENSE response after its header and block descriptors."""
+    if header_length == 4:
+        pos = 4 + data[3]
+    else:
+        pos = 8 + struct.unpack(">H", data[6:8])[0]
+    pages = []
+    while pos + 2 <= len(data):
+        pages.append(data[pos] & 0x3F)
+        pos += 2 + data[pos + 1]
+    return pages
+
+
+def test_optical_images(ctx):
+    iso, content = make_iso(ctx, "disc.iso", CD_SECTORS)
+    dvd = make_sparse(ctx.path("dvd.ISO"), DVD_SECTORS * 2048)
+    # --image (read-write) still serves an .iso read-only.
+    server = Server(ctx, ["--target", TARGET, "--ram", "1M", "--image", iso, "--image-ro", dvd])
+    with server:
+        s = ctx.session()
+        status, _, _ = s.full_login(TARGET, [("MaxRecvDataSegmentLength", "65536")])
+        ctx.check(status == 0, "login to a target with CD and DVD images")
+
+        st, data, _, _ = s.scsi(bytes([0x12, 0, 0, 0, 96, 0]), lun=1, read_len=96)
+        ctx.check(st == 0 and data[0] & 0x1F == 5 and data[1] & 0x80 and data[16:30] == b"SCSI DVD-ROM 1",
+                  "INQUIRY: CD/DVD-ROM device, removable medium")
+        st, data, _, _ = s.scsi(bytes([0x12, 0, 0, 0, 96, 0]), lun=0, read_len=96)
+        ctx.check(st == 0 and data[0] & 0x1F == 0 and not data[1] & 0x80, "INQUIRY: the RAM disk stays a disk")
+        st, data, _, _ = s.scsi(bytes([0x12, 1, 0xB0, 0, 255, 0]), lun=1, read_len=255)
+        ctx.check(st == 2 and asc(data) == 0x24, "VPD Block Limits is not provided by a CD/DVD-ROM drive")
+
+        st, data, _, _ = s.scsi(bytes([0x25] + [0] * 9), lun=1, read_len=8)
+        last, bs = struct.unpack(">II", data)
+        ctx.check(st == 0 and last + 1 == CD_SECTORS and bs == 2048,
+                  "READ CAPACITY (10): 2048-byte sectors, partial sector ignored")
+        st, data, _, _ = s.scsi(cdb10(0x28, 16, 1), lun=1, read_len=2048)
+        ctx.check(st == 0 and data[1:6] == b"CD001" and data == content[16 * 2048:17 * 2048],
+                  "READ (10) returns the ISO 9660 volume descriptor")
+        cdb12 = struct.pack(">BBIIBB", 0xA8, 0, 900, 100, 0, 0)
+        st, data, _, _ = s.scsi(cdb12, lun=1, read_len=100 * 2048)
+        ctx.check(st == 0 and data == content[900 * 2048:], "READ (12) up to the last sector")
+        st, data, _, _ = s.scsi(cdb10(0x28, CD_SECTORS, 1), lun=1, read_len=2048)
+        ctx.check(st == 2 and asc(data) == 0x21, "READ past the end of the disc -> LBA out of range")
+        st, data, _, _ = s.scsi(cdb10(0x2A, 0, 1), lun=1, write_data=bytes(2048))
+        ctx.check(st == 2 and sense_key(data) == 7, "WRITE -> DATA PROTECT")
+
+        st, data, _, _ = s.scsi(mmc_cdb(0x43), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and data == bytes([0, 18, 1, 1, 0, 0x14, 1, 0, 0, 0, 0, 0, 0, 0x14, 0xAA, 0]) +
+                  struct.pack(">I", CD_SECTORS), "READ TOC: track 1 and lead-out (LBA)")
+        st, data, _, _ = s.scsi(mmc_cdb(0x43, byte1=0x02), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and data[8:12] == b"\0" + msf(0) and data[16:20] == b"\0" + msf(CD_SECTORS),
+                  "READ TOC: MSF addresses")
+        st, data, _, _ = s.scsi(mmc_cdb(0x43, byte6=0xAA), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and len(data) == 12 and data[6] == 0xAA, "READ TOC from the lead-out")
+        st, data, _, _ = s.scsi(mmc_cdb(0x43, byte2=1), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and data[:4] == bytes([0, 10, 1, 1]) and data[6] == 1, "READ TOC: session information")
+        st, data, _, _ = s.scsi(mmc_cdb(0x43, byte9=0x40), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and data[:2] == bytes([0, 10]), "READ TOC: format in the old position (byte 9)")
+        st, data, _, _ = s.scsi(mmc_cdb(0x43, byte2=2), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and data[:2] == bytes([0, 46]) and data[4 + 3::11][:4] == bytes([0xA0, 0xA1, 0xA2, 1]) and
+                  data[4 + 22 + 8:4 + 22 + 11] == msf(CD_SECTORS), "READ TOC: raw TOC")
+        st, data, _, _ = s.scsi(mmc_cdb(0x43, byte2=4), lun=1, read_len=0xFFFF)
+        ctx.check(st == 2 and asc(data) == 0x24, "READ TOC: ATIP -> invalid field")
+        st, data, _, _ = s.scsi(mmc_cdb(0x43, byte6=2), lun=1, read_len=0xFFFF)
+        ctx.check(st == 2 and asc(data) == 0x24, "READ TOC: missing track -> invalid field")
+        st, data, _, _ = s.scsi(mmc_cdb(0x43, alloc=4), lun=1, read_len=4)
+        ctx.check(st == 0 and data == bytes([0, 18, 1, 1]), "READ TOC is truncated to the allocation length")
+
+        st, data, _, _ = s.scsi(mmc_cdb(0x46), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and struct.unpack(">IH", data[0:4] + data[6:8]) == (len(data) - 4, 0x0008) and
+                  feature_codes(data) == [0x00, 0x01, 0x03, 0x10, 0x1E, 0x1F], "GET CONFIGURATION: all features, CD")
+        ctx.check(data[12:14] == b"\x00\x10" and data[14] == 0 and data[16:18] == b"\x00\x08" and data[18] == 1,
+                  "GET CONFIGURATION: profile list (DVD-ROM, CD-ROM current)")
+        st, data, _, _ = s.scsi(mmc_cdb(0x46, byte1=1), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and feature_codes(data) == [0x00, 0x01, 0x03, 0x10, 0x1E],
+                  "GET CONFIGURATION: current features")
+        st, data, _, _ = s.scsi(bytes([0x46, 2, 0, 0x10, 0, 0, 0, 0xFF, 0xFF, 0]), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and feature_codes(data) == [0x10] and data[12:16] == struct.pack(">I", 2048),
+                  "GET CONFIGURATION: one feature (Random Readable)")
+        st, data, _, _ = s.scsi(bytes([0x46, 0, 0, 0x04, 0, 0, 0, 0xFF, 0xFF, 0]), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and feature_codes(data) == [0x10, 0x1E, 0x1F], "GET CONFIGURATION: starting feature")
+        st, data, _, _ = s.scsi(mmc_cdb(0x46), lun=2, read_len=0xFFFF)
+        ctx.check(st == 0 and data[6:8] == b"\x00\x10", "GET CONFIGURATION: a larger image is a DVD")
+
+        st, data, _, _ = s.scsi(bytes([0x4A, 1, 0, 0, 0x10, 0, 0, 0, 8, 0]), lun=1, read_len=8)
+        ctx.check(st == 0 and data == bytes([0, 4, 4, 0x10, 0, 2, 0, 0]), "GET EVENT STATUS NOTIFICATION: media present")
+        st, data, _, _ = s.scsi(bytes([0x4A, 1, 0, 0, 0x02, 0, 0, 0, 8, 0]), lun=1, read_len=8)
+        ctx.check(st == 0 and data == bytes([0, 0, 0x80, 0x10]), "GET EVENT STATUS NOTIFICATION: unsupported class")
+        st, data, _, _ = s.scsi(bytes([0x4A, 0, 0, 0, 0x10, 0, 0, 0, 8, 0]), lun=1, read_len=8)
+        ctx.check(st == 2 and asc(data) == 0x24, "GET EVENT STATUS NOTIFICATION: asynchronous -> invalid field")
+
+        st, data, _, _ = s.scsi(mmc_cdb(0x5A, byte2=0x2A), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and struct.unpack(">H", data[0:2])[0] + 2 == len(data) and data[6:8] == b"\0\0" and
+                  data[8] == 0x2A and data[3] == 0, "MODE SENSE (10): capabilities page, no block descriptor")
+        st, data, _, _ = s.scsi(mmc_cdb(0x5A, byte2=0x3F), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and mode_pages(data, 8) == [0x01, 0x2A], "MODE SENSE (10): all pages")
+        st, data, _, _ = s.scsi(bytes([0x1A, 0, 0x3F, 0, 255, 0]), lun=1, read_len=255)
+        ctx.check(st == 0 and data[0] + 1 == len(data) and mode_pages(data, 4) == [0x01, 0x2A],
+                  "MODE SENSE (6): all pages")
+        st, data, _, _ = s.scsi(mmc_cdb(0x5A, byte2=0x08), lun=1, read_len=0xFFFF)
+        ctx.check(st == 2 and asc(data) == 0x24, "MODE SENSE: caching page -> invalid field")
+        st, data, _, _ = s.scsi(mmc_cdb(0x5A, byte2=0x3F), lun=0, read_len=0xFFFF)
+        ctx.check(st == 0 and struct.unpack(">H", data[6:8])[0] == 8 and mode_pages(data, 8) == [0x08, 0x1C],
+                  "MODE SENSE (10) on a disk: block descriptor and pages")
+
+        st, data, _, _ = s.scsi(mmc_cdb(0x51), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and len(data) == 34 and data[2] == 0x0E and data[4] == 1, "READ DISC INFORMATION")
+        st, data, _, _ = s.scsi(bytes([0x52, 1, 0, 0, 0, 1, 0, 0xFF, 0xFF, 0]), lun=1, read_len=0xFFFF)
+        ctx.check(st == 0 and data[2] == 1 and struct.unpack(">I", data[24:28])[0] == CD_SECTORS,
+                  "READ TRACK INFORMATION: track 1")
+        st, data, _, _ = s.scsi(bytes([0x52, 0, 0, 0, 0x03, 0xE8, 0, 0xFF, 0xFF, 0]), lun=1, read_len=0xFFFF)
+        ctx.check(st == 2 and asc(data) == 0x24, "READ TRACK INFORMATION: LBA past the end -> invalid field")
+
+        dvd_structure = bytes([0xAD, 0, 0, 0, 0, 0, 0, 0x00, 0x08, 0x04, 0, 0])
+        st, data, _, _ = s.scsi(dvd_structure, lun=1, read_len=2052)
+        ctx.check(st == 2 and sense_key(data) == 5 and asc(data) == 0x30, "READ DVD STRUCTURE on a CD -> incompatible")
+        st, data, _, _ = s.scsi(dvd_structure, lun=2, read_len=2052)
+        ctx.check(st == 0 and len(data) == 2052 and data[4] == 0x01 and
+                  struct.unpack(">II", data[8:16]) == (0x30000, 0x30000 + DVD_SECTORS - 1),
+                  "READ DVD STRUCTURE: physical format of a DVD")
+        st, data, _, _ = s.scsi(dvd_structure[:7] + b"\x01" + dvd_structure[8:], lun=2, read_len=2052)
+        ctx.check(st == 0 and data == bytes([0, 6, 0, 0, 0, 0, 0, 0]), "READ DVD STRUCTURE: no copy protection")
+
+        st, data, _, _ = s.scsi(bytes([0xBD, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0]), lun=1, read_len=8)
+        ctx.check(st == 0 and len(data) == 8, "MECHANISM STATUS")
+        st, _, _, _ = s.scsi(bytes([0x1E, 0, 0, 0, 1, 0]), lun=1)
+        st2, _, _, _ = s.scsi(bytes([0x1B, 0, 0, 0, 2, 0]), lun=1)
+        ctx.check(st == 0 and st2 == 0, "PREVENT ALLOW MEDIUM REMOVAL and eject are accepted")
+        st, data, _, _ = s.scsi(cdb10(0x28, 16, 1), lun=1, read_len=2048)
+        ctx.check(st == 0 and data[1:6] == b"CD001", "the disc is still readable after an eject request")
+        st, data, _, _ = s.scsi(mmc_cdb(0x43), lun=0, read_len=0xFFFF)
+        ctx.check(st == 2 and asc(data) == 0x20, "READ TOC on a disk -> invalid command")
+        s.logout()
+    ctx.check(re.search(r"LUN 1: .*disc\.iso, .*\(read-only\)", server.output) is not None,
+              "the .iso LUN is listed as read-only")
+
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--port", str(ctx.port), "--image",
+                       make_sparse(ctx.path("tiny.iso"), 2000))
+    ctx.check(rc == 2 and "Cannot open" in out, "an .iso smaller than one sector is refused")
+
+
+def powershell(script, timeout=180):
+    command = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; $ErrorActionPreference = 'Stop'; " + script
+    result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+                            capture_output=True, timeout=timeout)
+    return result.returncode, (result.stdout + result.stderr).decode("utf-8", "replace").strip()
+
+
+def find_cd_volume(label, timeout=30):
+    """Drive letter ("E:") of the CD/DVD volume with this label, or None."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        _, out = powershell("(Get-CimInstance Win32_LogicalDisk -Filter \"DriveType=5 AND VolumeName='"
+                            + label + "'\").DeviceID")
+        if re.fullmatch(r"[A-Z]:", out):
+            return out
+        time.sleep(1)
+    return None
+
+
+def test_optical_elevated(ctx):
+    """Needs administrator rights: connects the Microsoft iSCSI Initiator to a
+    CD and a DVD image and reads files through Windows' CD-ROM driver and CDFS."""
+    if not is_elevated():
+        print("  SKIP not running as administrator")
+        return
+    target = "iqn.2026-10.test:optical"
+    hello = b"Hello from TISCSI\r\n"
+    payload = os.urandom(3 * MiB)
+    files = {"HELLO.TXT": hello, "RANDOM.BIN": payload}
+    cd = iso_tool.make_iso(ctx.path("win-cd.iso"), files, "TISCSI_CD")
+    dvd = iso_tool.make_iso(ctx.path("win-dvd.iso"), files, "TISCSI_DVD")
+    make_sparse(dvd, DVD_SECTORS * 2048)
+
+    _, status = powershell("(Get-Service MSiSCSI).Status")
+    started_service = status != "Running"
+    if started_service:
+        rc, out = powershell("Start-Service MSiSCSI")
+        ctx.check(rc == 0, "the Microsoft iSCSI Initiator service starts")
+        if rc:
+            print(out)
+            return
+    portal = f"-TargetPortalAddress {HOST} -TargetPortalPortNumber {ctx.port}"
+    try:
+        with Server(ctx, ["--target", target, "--image-ro", cd, "--image-ro", dvd]):
+            rc, out = powershell(f"New-IscsiTargetPortal {portal} | Out-Null; "
+                                 f"Connect-IscsiTarget -NodeAddress {target} {portal} | Out-Null")
+            ctx.check(rc == 0, "Microsoft iSCSI Initiator logs in")
+            if rc:
+                print(out)
+            try:
+                for label in ("TISCSI_CD", "TISCSI_DVD"):
+                    drive = find_cd_volume(label) if rc == 0 else None
+                    ctx.check(drive is not None, f"Windows mounts {label} on a CD/DVD drive")
+                    if drive:
+                        with open(drive + "\\HELLO.TXT", "rb") as f:
+                            text = f.read()
+                        with open(drive + "\\RANDOM.BIN", "rb") as f:
+                            data = f.read()
+                        ctx.check(text == hello and data == payload, f"{label}: files read back through CDFS")
+                _, out = powershell("Get-CimInstance Win32_CDROMDrive | Where-Object Caption -like 'TISCSI*' | "
+                                    "ForEach-Object { \"$($_.Caption)|$($_.MediaLoaded)\" }")
+                ctx.check(out.count("|True") == 2, f"Win32_CDROMDrive lists both drives with media ({out!r})")
+            finally:
+                powershell(f"Disconnect-IscsiTarget -NodeAddress {target} -Confirm:$false")
+                powershell(f"Remove-IscsiTargetPortal {portal} -Confirm:$false")
+    finally:
+        if started_service:
+            powershell("Stop-Service MSiSCSI")
 
 
 # ---- Physical disks, volumes, SCSI pass-through ------------------------------
@@ -1037,7 +1300,8 @@ def test_gui(ctx):
 
 
 TESTS = [test_cli_errors, test_protocol, test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
-         test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_devices_unprivileged,
+         test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_optical_images,
+         test_optical_elevated, test_devices_unprivileged,
          test_devices_elevated, test_dynamic_volumes, test_dynamic_volumes_elevated, test_gui]
 
 

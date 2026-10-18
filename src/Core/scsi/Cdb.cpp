@@ -66,6 +66,10 @@ std::optional<Cdb> Cdb::Parse(const std::array<uint8_t, 16>& bytes)
     case op::Release6:
         Parse6(b, cdb);
         break;
+    case op::StartStopUnit:
+    case op::PreventAllowMediumRemoval:
+        cdb.control = b[5];
+        break;
     case op::Inquiry:
         cdb.evpd = (b[1] & 0x01) != 0;
         cdb.pageCode = static_cast<VpdPage>(b[2]);
@@ -80,6 +84,30 @@ std::optional<Cdb> Cdb::Parse(const std::array<uint8_t, 16>& bytes)
         cdb.transferLength = b[4];
         cdb.control = b[5];
         break;
+    case op::ModeSense10:
+        cdb.disableBlockDescriptors = (b[1] & 0x08) != 0;
+        cdb.pageControl = b[2] >> 6;
+        cdb.modePageCode = static_cast<ModePageCode>(b[2] & 0x3F);
+        cdb.subpageCode = b[3];
+        cdb.transferLength = ReadBE16(b + 7);
+        cdb.control = b[9];
+        break;
+    case op::ReadToc:
+    case op::GetConfiguration:
+    case op::GetEventStatusNotification:
+    case op::ReadDiscInformation:
+    case op::ReadTrackInformation:
+        cdb.transferLength = ReadBE16(b + 7);
+        cdb.control = b[9];
+        break;
+    case op::ReadDvdStructure:
+    case op::MechanismStatus:
+        cdb.transferLength = ReadBE16(b + 8);
+        cdb.control = b[11];
+        break;
+    case op::SetCdSpeed:
+        cdb.control = b[11];
+        break;
     case op::ReadCapacity10:
     case op::Read10:
     case op::Write10:
@@ -89,6 +117,8 @@ std::optional<Cdb> Cdb::Parse(const std::array<uint8_t, 16>& bytes)
         Parse10(b, cdb);
         break;
     case op::ReportLuns:
+    case op::Read12:
+    case op::Write12:
         Parse12(b, cdb);
         break;
     case op::Read16:
