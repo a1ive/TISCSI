@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "Core/config/ServerConfig.h"
 #include "Core/disk/Disk.h"
 
 #include <windows.h>
@@ -19,6 +20,9 @@ namespace tiscsi {
 struct DiskChoice {
     std::unique_ptr<disk::Disk> disk;
     std::wstring description; // shown in the target's disk list
+    // How a saved configuration names the disk: devices by their stable
+    // names, taken when the disk is chosen (disk numbers can change later).
+    config::DiskSpec spec;
 };
 
 // Each returns false if cancelled. On success `choice` holds the opened disk.

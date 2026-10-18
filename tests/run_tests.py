@@ -1451,6 +1451,8 @@ class Gui:
     IDOK, IDC_PORT, IDC_START, IDC_ADD_TARGET = 1, 1011, 1012, 1014
     IDC_TARGET_NAME, IDC_CREATE_RAMDISK, IDC_SIZE_MB, IDM_LANG_FIRST = 1020, 1023, 1033, 40101
     IDC_ADD_IMAGE, IDC_PATH, IDC_READ_ONLY, IDC_OPTICAL = 1024, 1030, 1032, 1038
+    IDCANCEL, IDM_FILE_OPEN_CONFIG, IDM_FILE_SAVE_CONFIG = 2, 40003, 40004
+    IDC_STATIC_TEXT = 0xFFFF  # message box text
     BM_GETCHECK, BM_CLICK = 0x00F0, 0x00F5
 
     def __init__(self, exe, args):
@@ -1508,6 +1510,28 @@ class Gui:
 
     def command(self, window, command_id):
         self.user32.PostMessageW(window, self.WM_COMMAND, command_id, 0)
+
+    def class_name(self, hwnd):
+        buffer = self.ctypes.create_unicode_buffer(256)
+        self.user32.GetClassNameW(hwnd, buffer, 256)
+        return buffer.value
+
+    def file_dialog_name_box(self, dialog):
+        """The file name edit box of an Open / Save As dialog: an Edit in a
+        ComboBox (the address bar's ComboBox sits in a ComboBoxEx32)."""
+        ctypes, wintypes = self.ctypes, self.wintypes
+        found = []
+        proc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+        def callback(hwnd, _):
+            parent = self.user32.GetParent(hwnd)
+            if self.class_name(hwnd) == "Edit" and self.class_name(parent) == "ComboBox" and \
+                    self.class_name(self.user32.GetParent(parent)) != "ComboBoxEx32":
+                found.append(hwnd)
+            return True
+
+        self.user32.EnumChildWindows(dialog, proc(callback), 0)
+        return found[0] if found else None
 
     def status_text(self, window):
         status = self.user32.FindWindowExW(window, None, "msctls_statusbar32", None)
@@ -1581,6 +1605,24 @@ def test_gui(ctx):
         time.sleep(0.8)
         ctx.check("0 active session(s)" in gui.status_text(main), "status bar: session ended")
 
+        # File > Save Configuration As, through the common file dialog.
+        saved = ctx.path("gui saved.conf")
+        gui.command(main, Gui.IDM_FILE_SAVE_CONFIG)
+        dialog = gui.top_window()
+        name_box = gui.file_dialog_name_box(dialog) if dialog else None
+        if name_box:
+            buffer = gui.ctypes.create_unicode_buffer(saved)
+            gui.user32.SendMessageW(name_box, Gui.WM_SETTEXT, 0, gui.ctypes.addressof(buffer))
+            gui.command(dialog, Gui.IDOK)
+            time.sleep(1.5)
+        if gui.top_window() != main and dialog:
+            gui.command(dialog, Gui.IDCANCEL)  # do not leave the dialog open for the checks below
+        text = open(saved, encoding="utf-8-sig").read() if os.path.exists(saved) else ""
+        ctx.check(f"port = {ctx.port}\n" in text and
+                  f"[target {TARGET}]\nram = 64M\nimage = {os.path.basename(iso)}\n"
+                  f"cdrom = {os.path.basename(disc)}\n" in text,
+                  "File > Save Configuration As writes the targets added in the GUI (paths relative to the file)")
+
         gui.command(main, Gui.IDM_LANG_FIRST + 1)  # View > Language > 日本語
         japanese = gui.top_window()
         ctx.check(japanese is not None and "待ち受け中" in gui.status_text(japanese),
@@ -1595,6 +1637,51 @@ def test_gui(ctx):
             ctx.check(gui.process.returncode == 0, "the window closes and the process exits")
         except subprocess.TimeoutExpired:
             ctx.check(False, "the window closes and the process exits")
+
+        # --config opens the saved configuration and starts the server.
+        gui.close()
+        gui = Gui(gui_exe, ["--lang=en-US", "--config", saved])
+        main = gui.top_window()
+        time.sleep(1.0)
+        ctx.check(f":{ctx.port} - 0 active session(s)" in gui.status_text(main), "--config starts the server")
+        s = ctx.session()
+        status, _, _ = s.full_login(TARGET)
+        st, size, _ = s.capacity()
+        st2, sector, _, _ = s.scsi(cdb10(0x28, 63, 1), lun=2, read_len=2048)
+        ctx.check(status == 0 and size == 64 * MiB and st2 == 0 and sector == disc_content[63 * 2048:],
+                  "the opened configuration serves the same disks")
+        s.logout()
+        gui.user32.PostMessageW(main, Gui.WM_CLOSE, 0, 0)
+        gui.process.wait(timeout=10)
+
+        # Targets that cannot be opened are listed; the others are served.
+        broken = ctx.path("gui broken.conf")
+        with open(broken, "w", encoding="utf-8") as f:
+            f.write(f"[server]\nport = {ctx.port}\n[target iqn.2026-10.test:missing]\nimage = {ctx.path('missing.img')}\n"
+                    f"[target {TARGET}]\nram = 1M\n")
+        gui.close()
+        gui = Gui(gui_exe, ["--lang=en-US", "--config", broken])
+        box = gui.top_window()
+        message = gui.text(gui.user32.GetDlgItem(box, Gui.IDC_STATIC_TEXT)) if box else ""
+        ctx.check("iqn.2026-10.test:missing" in message and "missing.img" in message,
+                  "a target that cannot be opened is reported")
+        if box:
+            # The OK button of an MB_OK box is IDCANCEL. BM_CLICK can miss a
+            # window that is not active, so send the command.
+            gui.command(box, Gui.IDCANCEL)
+        main = gui.top_window()
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            try:
+                socket.create_connection((HOST, ctx.port), timeout=1).close()
+                break
+            except OSError:
+                time.sleep(0.2)
+        s = ctx.session()
+        ctx.check(s.full_login(TARGET)[0] == 0, "the other targets of the configuration are served")
+        s.logout()
+        gui.user32.PostMessageW(main, Gui.WM_CLOSE, 0, 0)
+        gui.process.wait(timeout=10)
     finally:
         gui.close()
         if saved_ini is None:

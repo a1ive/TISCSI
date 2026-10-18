@@ -7,6 +7,7 @@
 #include "Common/Text.h"
 #include "Core/disk/DeviceDisk.h"
 #include "Core/disk/DiskImage.h"
+#include "Core/disk/File.h"
 #include "Core/disk/IsoImage.h"
 #include "Core/disk/RamDisk.h"
 #include "Core/disk/Vhd.h"
@@ -147,6 +148,10 @@ private:
             return false;
         }
         m_choice.description = path;
+        m_choice.spec.kind = config::DiskSpec::Kind::Image;
+        m_choice.spec.path = disk::FullPath(path);
+        m_choice.spec.readOnly = readOnly;
+        m_choice.spec.optical = optical;
         return true;
     }
 
@@ -268,6 +273,8 @@ private:
             return;
         }
         m_choice.description = m_path;
+        m_choice.spec.kind = config::DiskSpec::Kind::Image;
+        m_choice.spec.path = disk::FullPath(m_path);
         EndDialog(m_dialog, IDOK);
     }
 
@@ -311,6 +318,8 @@ private:
             return false;
         }
         m_choice.description = i18n::Str(IDS_DESC_RAM_DISK);
+        m_choice.spec.kind = config::DiskSpec::Kind::RamDisk;
+        m_choice.spec.size = *sizeMb * kMiB;
         return true;
     }
 
@@ -389,6 +398,10 @@ private:
         if (!model.empty()) {
             m_choice.description += L" (" + model + L")";
         }
+        m_choice.spec.kind = config::DiskSpec::Kind::PhysicalDisk;
+        m_choice.spec.path = std::to_wstring(info.index);
+        m_choice.spec.readOnly = readOnly;
+        config::UseStableName(m_choice.spec, {});
         return true;
     }
 
@@ -531,6 +544,8 @@ private:
                 error.path = name;
             }
             m_choice.description = i18n::Format(IDS_DESC_DYNAMIC_VOLUME, name);
+            m_choice.spec.kind = config::DiskSpec::Kind::DynamicVolume;
+            m_choice.spec.path = L"{" + id + L"}";
         } else {
             const disk::VolumeInfo& info = m_volumes[row.index];
             name = VolumeDisplayName(info);
@@ -539,11 +554,15 @@ private:
                 error.path = name;
             }
             m_choice.description = i18n::Format(IDS_DESC_VOLUME, name);
+            m_choice.spec.kind = config::DiskSpec::Kind::Volume;
+            m_choice.spec.path = info.volumeName;
         }
         if (!m_choice.disk) {
             ui::ShowError(m_dialog, ui::ExplainOpenError(error, true));
             return false;
         }
+        m_choice.spec.readOnly = readOnly;
+        config::UseStableName(m_choice.spec, {});
         return true;
     }
 

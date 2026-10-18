@@ -11,6 +11,9 @@ IDR_MAINMENU MENU
 BEGIN
     POPUP "파일(&F)"
     BEGIN
+        MENUITEM "구성 열기(&O)...", IDM_FILE_OPEN_CONFIG
+        MENUITEM "다른 이름으로 구성 저장(&S)...", IDM_FILE_SAVE_CONFIG
+        MENUITEM SEPARATOR
         MENUITEM "끝내기(&X)", IDM_FILE_EXIT
     END
     POPUP "보기(&V)"
@@ -151,7 +154,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "TISCSI"
     IDS_ABOUT_VERSION       "버전 {0}"
-    IDS_USAGE               "명령줄 옵션:\n\n/log\t프로그램 폴더에 로그 파일을 기록합니다\n--log=<파일>\t지정한 파일에 로그를 기록합니다\n--lang=<태그>\t표시 언어 (en-US, ja-JP, zh-CN, zh-TW, ko-KR)"
+    IDS_USAGE               "명령줄 옵션:\n\n/log\t프로그램 폴더에 로그 파일을 기록합니다\n--log=<파일>\t지정한 파일에 로그를 기록합니다\n--lang=<태그>\t표시 언어 (en-US, ja-JP, zh-CN, zh-TW, ko-KR)\n--config=<파일>\t구성 파일을 열고 서버를 시작합니다"
     IDS_ERR_LOG_FILE        "로그 파일 {0}을(를) 열 수 없습니다:\n{1}"
 
     IDS_ANY_ADDRESS         "모두"
@@ -214,4 +217,24 @@ BEGIN
     IDS_ERR_AMBIGUOUS_VOLUME "이름이 {0}인 동적 볼륨이 여러 개 있습니다."
     IDS_ERR_VOLUME_FAILED   "동적 볼륨 {0}을(를) 사용할 수 없습니다: 데이터가 있는 디스크가 없습니다."
     IDS_ERR_DEGRADED_WRITE  "동적 볼륨 {0}에 구성원 디스크가 없습니다. 쓰면 구성원 사이의 일관성이 깨지므로 읽기 전용으로 추가하십시오."
+    IDS_FILTER_CONFIG       "TISCSI 구성 파일 (*.conf)|*.conf|모든 파일 (*.*)|*.*|"
+    IDS_ERR_CONFIG_READ     "구성 파일 {0}을(를) 읽을 수 없습니다:\n{1}"
+    IDS_ERR_CONFIG_LINE     "{0}, {1}번째 줄:\n{2}"
+    IDS_ERR_CONFIG_FILE     "{0}:\n{1}"
+    IDS_ERR_CONFIG_SAVE     "구성 파일 {0}을(를) 쓸 수 없습니다:\n{1}"
+    IDS_ERR_CONFIG_SESSIONS "이니시에이터가 로그온되어 있습니다. 구성을 열기 전에 연결을 끊으십시오."
+    IDS_ERR_CONFIG_TARGETS  "다음 대상은 열 수 없어서 제공되지 않습니다:\n\n{0}"
+    IDS_CONFIRM_UNSTABLE    "다음 장치에는 고정 이름이 없습니다. 번호나 경로로 저장되므로 다시 시작한 후 다른 장치를 가리킬 수 있습니다:\n\n{0}\n그래도 저장하시겠습니까?"
+    IDS_ERR_CONFIG_UNKNOWN  "알 수 없는 설정: {0}"
+    IDS_ERR_CONFIG_VALUE    "{0}의 값이 잘못되었습니다: {1}"
+    IDS_ERR_CONFIG_TARGET_NAME "잘못된 iSCSI 대상 이름: {0}"
+    IDS_ERR_CONFIG_SPTI_MIXED "대상 {0}: spti는 디스크나 다른 spti와 함께 사용할 수 없습니다."
+    IDS_ERR_CONFIG_NOT_IN_TARGET "{0}은(는) [target <이름>] 섹션에 있어야 합니다."
+    IDS_ERR_CONFIG_NOT_IN_SERVER "{0}은(는) [server] 섹션에 있어야 합니다."
+    IDS_ERR_CONFIG_INVALID_LINE "설정이나 섹션이 아닙니다: {0}"
+    IDS_ERR_CONFIG_UNKNOWN_SECTION "알 수 없는 섹션: {0}"
+    IDS_ERR_CONFIG_EMPTY_TARGET "대상 {0}에 디스크가 없습니다."
+    IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk는 동적 볼륨과 함께 사용해야 합니다."
+    IDS_ERR_NO_SUCH_DEVICE  "이름이 {0}인 장치가 없습니다. 연결되어 있지 않을 수 있습니다."
+    IDS_ERR_AMBIGUOUS_DEVICE "이름이 {0}인 장치가 여러 개 있습니다."
 END

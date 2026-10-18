@@ -46,6 +46,13 @@ adding it (set automatically for `.iso` files). Physical
 disks and volumes need TISCSI to run as administrator. Start with `/log` to
 write a log file next to the executable.
 
+**File > Save Configuration As...** writes the targets and the listening
+address to a [configuration file](#configuration-files) that `TISCSICli
+--config` also reads; disks and volumes are saved by their stable names.
+**File > Open Configuration...** replaces the targets with a file's, and
+`TISCSI.exe --config <file>` opens one and starts the server. Targets that
+cannot be opened are listed and left out.
+
 ## Command line
 
 `TISCSICli.exe` serves disk images and RAM disks. Images are recognized by

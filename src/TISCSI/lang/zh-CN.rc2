@@ -11,6 +11,9 @@ IDR_MAINMENU MENU
 BEGIN
     POPUP "文件(&F)"
     BEGIN
+        MENUITEM "打开配置(&O)...", IDM_FILE_OPEN_CONFIG
+        MENUITEM "配置另存为(&S)...", IDM_FILE_SAVE_CONFIG
+        MENUITEM SEPARATOR
         MENUITEM "退出(&X)", IDM_FILE_EXIT
     END
     POPUP "查看(&V)"
@@ -151,7 +154,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "TISCSI"
     IDS_ABOUT_VERSION       "版本 {0}"
-    IDS_USAGE               "命令行选项:\n\n/log\t在程序所在文件夹中写入日志文件\n--log=<文件>\t将日志写入指定文件\n--lang=<标记>\t界面语言 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)"
+    IDS_USAGE               "命令行选项:\n\n/log\t在程序所在文件夹中写入日志文件\n--log=<文件>\t将日志写入指定文件\n--lang=<标记>\t界面语言 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)\n--config=<文件>\t打开配置文件并启动服务器"
     IDS_ERR_LOG_FILE        "无法打开日志文件 {0}:\n{1}"
 
     IDS_ANY_ADDRESS         "任意"
@@ -214,4 +217,24 @@ BEGIN
     IDS_ERR_AMBIGUOUS_VOLUME "有多个名为 {0} 的动态卷。"
     IDS_ERR_VOLUME_FAILED   "无法使用动态卷 {0}: 存放其数据的磁盘缺失。"
     IDS_ERR_DEGRADED_WRITE  "动态卷 {0} 缺少成员磁盘。写入会导致各成员不一致，请以只读方式添加。"
+    IDS_FILTER_CONFIG       "TISCSI 配置文件 (*.conf)|*.conf|所有文件 (*.*)|*.*|"
+    IDS_ERR_CONFIG_READ     "无法读取配置文件 {0}:\n{1}"
+    IDS_ERR_CONFIG_LINE     "{0} 第 {1} 行:\n{2}"
+    IDS_ERR_CONFIG_FILE     "{0}:\n{1}"
+    IDS_ERR_CONFIG_SAVE     "无法写入配置文件 {0}:\n{1}"
+    IDS_ERR_CONFIG_SESSIONS "有发起程序已登录。请先断开它们，再打开配置。"
+    IDS_ERR_CONFIG_TARGETS  "以下目标无法打开，不会提供:\n\n{0}"
+    IDS_CONFIRM_UNSTABLE    "以下设备没有固定名称，将按编号或路径保存，重启后可能指向其他设备:\n\n{0}\n仍要保存吗?"
+    IDS_ERR_CONFIG_UNKNOWN  "未知的设置: {0}"
+    IDS_ERR_CONFIG_VALUE    "{0} 的值无效: {1}"
+    IDS_ERR_CONFIG_TARGET_NAME "iSCSI 目标名称无效: {0}"
+    IDS_ERR_CONFIG_SPTI_MIXED "目标 {0}: spti 不能与磁盘或另一个 spti 同时使用。"
+    IDS_ERR_CONFIG_NOT_IN_TARGET "{0} 必须位于 [target <名称>] 节中。"
+    IDS_ERR_CONFIG_NOT_IN_SERVER "{0} 必须位于 [server] 节中。"
+    IDS_ERR_CONFIG_INVALID_LINE "既不是设置也不是节: {0}"
+    IDS_ERR_CONFIG_UNKNOWN_SECTION "未知的节: {0}"
+    IDS_ERR_CONFIG_EMPTY_TARGET "目标 {0} 没有磁盘。"
+    IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk 只能与动态卷一起使用。"
+    IDS_ERR_NO_SUCH_DEVICE  "没有名为 {0} 的设备，它可能未连接。"
+    IDS_ERR_AMBIGUOUS_DEVICE "有多个设备名为 {0}。"
 END

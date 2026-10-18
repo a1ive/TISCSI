@@ -8,6 +8,7 @@
 
 #include "App.h"
 #include "Core/disk/Disk.h"
+#include "DiskDialogs.h"
 
 #include <windows.h>
 
@@ -27,7 +28,7 @@ private:
     static INT_PTR CALLBACK DialogProc(HWND dialog, UINT msg, WPARAM wParam, LPARAM lParam);
     INT_PTR HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam);
     void OnInit();
-    void AddDisk(std::unique_ptr<disk::Disk> disk, std::wstring description);
+    void AddDisk(DiskChoice choice);
     void RemoveDisk();
     bool Accept();
     void UpdateUi();
@@ -35,6 +36,7 @@ private:
     App& m_app;
     HWND m_dialog = nullptr;
     std::vector<std::unique_ptr<disk::Disk>> m_disks; // released if the dialog is cancelled
+    std::vector<config::DiskSpec> m_specs;          // one per disk
 };
 
 } // namespace tiscsi

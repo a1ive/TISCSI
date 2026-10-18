@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "Core/config/ServerConfig.h"
 #include "Core/iscsi/IscsiServer.h"
 #include "Core/util/Log.h"
 
@@ -31,14 +32,17 @@ public:
     iscsi::IscsiServer& Server() { return m_server; }
     util::Logger ScsiLogger() const { return util::Logger("Virtual SCSI Target", m_sink); }
 
+    util::Logger SptiLogger() const { return util::Logger("SPTI Target", m_sink); }
+
     struct TargetEntry {
         std::shared_ptr<iscsi::IscsiTarget> target;
         size_t lunCount = 0;
+        config::TargetSpec spec; // what a saved configuration names
     };
     const std::vector<TargetEntry>& Targets() const { return m_targets; }
     bool HasTargetNamed(const std::string& name) const;
     // Registers the target with the server; false if the name is taken.
-    bool AddTarget(std::shared_ptr<iscsi::IscsiTarget> target, size_t lunCount);
+    bool AddTarget(std::shared_ptr<iscsi::IscsiTarget> target, size_t lunCount, config::TargetSpec spec);
     // False while initiators are logged in. Disks are released with the target.
     bool RemoveTarget(size_t index);
 
@@ -53,6 +57,12 @@ public:
     std::wstring addressText;
     uint16_t port = iscsi::IscsiServer::kDefaultPort;
     unsigned nextTargetNumber = 1;
+    // The last opened configuration's settings the GUI does not use itself
+    // (log, verbosity, wait, ldm-disk, ...), kept so that saving keeps them.
+    // `targets` stays empty.
+    config::ServerConfig settings;
+    // --config: opened, and the server started, once the window is shown.
+    std::wstring startupConfig;
 
 private:
     void OnSessionDelta(const std::string& targetName, int delta);

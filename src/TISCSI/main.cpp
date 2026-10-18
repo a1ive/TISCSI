@@ -28,6 +28,7 @@ namespace {
 struct CommandLine {
     std::wstring language;
     std::wstring logFile;
+    std::wstring configFile;
     bool valid = true;
 };
 
@@ -70,6 +71,10 @@ CommandLine ParseCommandLine()
             result.logFile = arg.substr(6);
         } else if (arg == L"--log" && i + 1 < argc) {
             result.logFile = argv[++i];
+        } else if (arg.starts_with(L"--config=")) {
+            result.configFile = arg.substr(9);
+        } else if (arg == L"--config" && i + 1 < argc) {
+            result.configFile = argv[++i];
         } else {
             result.valid = false;
         }
@@ -108,6 +113,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int)
 
     // Declared after logFile: the server stops before the log is closed.
     App app(sink);
+    app.startupConfig = commandLine.configFile;
     for (;;) {
         MainDialog dialog(app, language);
         if (dialog.Run() != MainDialog::kRecreate) {

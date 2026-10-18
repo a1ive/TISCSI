@@ -11,6 +11,9 @@ IDR_MAINMENU MENU
 BEGIN
     POPUP "檔案(&F)"
     BEGIN
+        MENUITEM "開啟設定(&O)...", IDM_FILE_OPEN_CONFIG
+        MENUITEM "設定另存新檔(&S)...", IDM_FILE_SAVE_CONFIG
+        MENUITEM SEPARATOR
         MENUITEM "結束(&X)", IDM_FILE_EXIT
     END
     POPUP "檢視(&V)"
@@ -151,7 +154,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "TISCSI"
     IDS_ABOUT_VERSION       "版本 {0}"
-    IDS_USAGE               "命令列選項:\n\n/log\t在程式所在資料夾寫入記錄檔\n--log=<檔案>\t將記錄寫入指定的檔案\n--lang=<標記>\t介面語言 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)"
+    IDS_USAGE               "命令列選項:\n\n/log\t在程式所在資料夾寫入記錄檔\n--log=<檔案>\t將記錄寫入指定的檔案\n--lang=<標記>\t介面語言 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)\n--config=<檔案>\t開啟設定檔並啟動伺服器"
     IDS_ERR_LOG_FILE        "無法開啟記錄檔 {0}:\n{1}"
 
     IDS_ANY_ADDRESS         "任何"
@@ -214,4 +217,24 @@ BEGIN
     IDS_ERR_AMBIGUOUS_VOLUME "有多個名為 {0} 的動態磁碟區。"
     IDS_ERR_VOLUME_FAILED   "無法使用動態磁碟區 {0}: 存放其資料的磁碟遺失。"
     IDS_ERR_DEGRADED_WRITE  "動態磁碟區 {0} 缺少成員磁碟。寫入會使各成員不一致，請以唯讀方式新增。"
+    IDS_FILTER_CONFIG       "TISCSI 設定檔 (*.conf)|*.conf|所有檔案 (*.*)|*.*|"
+    IDS_ERR_CONFIG_READ     "無法讀取設定檔 {0}:\n{1}"
+    IDS_ERR_CONFIG_LINE     "{0} 第 {1} 行:\n{2}"
+    IDS_ERR_CONFIG_FILE     "{0}:\n{1}"
+    IDS_ERR_CONFIG_SAVE     "無法寫入設定檔 {0}:\n{1}"
+    IDS_ERR_CONFIG_SESSIONS "有啟動器已登入。請先中斷它們，再開啟設定。"
+    IDS_ERR_CONFIG_TARGETS  "下列目標無法開啟，不會提供:\n\n{0}"
+    IDS_CONFIRM_UNSTABLE    "下列裝置沒有固定名稱，將依編號或路徑儲存，重新開機後可能指向其他裝置:\n\n{0}\n仍要儲存嗎?"
+    IDS_ERR_CONFIG_UNKNOWN  "未知的設定: {0}"
+    IDS_ERR_CONFIG_VALUE    "{0} 的值無效: {1}"
+    IDS_ERR_CONFIG_TARGET_NAME "iSCSI 目標名稱無效: {0}"
+    IDS_ERR_CONFIG_SPTI_MIXED "目標 {0}: spti 不能與磁碟或另一個 spti 合併使用。"
+    IDS_ERR_CONFIG_NOT_IN_TARGET "{0} 必須位於 [target <名稱>] 區段中。"
+    IDS_ERR_CONFIG_NOT_IN_SERVER "{0} 必須位於 [server] 區段中。"
+    IDS_ERR_CONFIG_INVALID_LINE "既不是設定也不是區段: {0}"
+    IDS_ERR_CONFIG_UNKNOWN_SECTION "未知的區段: {0}"
+    IDS_ERR_CONFIG_EMPTY_TARGET "目標 {0} 沒有磁碟。"
+    IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk 只能與動態磁碟區一起使用。"
+    IDS_ERR_NO_SUCH_DEVICE  "沒有名為 {0} 的裝置，它可能未連接。"
+    IDS_ERR_AMBIGUOUS_DEVICE "有多個裝置名為 {0}。"
 END

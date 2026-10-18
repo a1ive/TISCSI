@@ -82,7 +82,7 @@ INT_PTR AddTargetDialog::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam)
             return FALSE;
         }
         if (chosen) {
-            AddDisk(std::move(choice.disk), std::move(choice.description));
+            AddDisk(std::move(choice));
         }
         return TRUE;
     }
@@ -102,13 +102,14 @@ void AddTargetDialog::OnInit()
     UpdateUi();
 }
 
-void AddTargetDialog::AddDisk(std::unique_ptr<disk::Disk> disk, std::wstring description)
+void AddTargetDialog::AddDisk(DiskChoice choice)
 {
-    if (disk->IsReadOnly()) {
-        description += i18n::Str(IDS_READ_ONLY_SUFFIX);
+    if (choice.disk->IsReadOnly()) {
+        choice.description += i18n::Str(IDS_READ_ONLY_SUFFIX);
     }
-    ui::AddListRow(GetDlgItem(m_dialog, IDC_DISKS), {description, text::FormatSize(disk->Size())});
-    m_disks.push_back(std::move(disk));
+    ui::AddListRow(GetDlgItem(m_dialog, IDC_DISKS), {choice.description, text::FormatSize(choice.disk->Size())});
+    m_disks.push_back(std::move(choice.disk));
+    m_specs.push_back(std::move(choice.spec));
     UpdateUi();
 }
 
@@ -121,6 +122,7 @@ void AddTargetDialog::RemoveDisk()
     }
     ListView_DeleteItem(list, selected);
     m_disks.erase(m_disks.begin() + selected); // closes the disk and releases its locks
+    m_specs.erase(m_specs.begin() + selected);
     UpdateUi();
 }
 
@@ -141,7 +143,7 @@ bool AddTargetDialog::Accept()
     }
     const size_t lunCount = m_disks.size();
     auto target = std::make_shared<iscsi::IscsiTarget>(name, std::move(m_disks), m_app.ScsiLogger());
-    if (!m_app.AddTarget(std::move(target), lunCount)) {
+    if (!m_app.AddTarget(std::move(target), lunCount, config::TargetSpec{name, std::move(m_specs), {}})) {
         ui::ShowError(m_dialog, i18n::Format(IDS_ERR_TARGET_EXISTS, text::Utf8ToWide(name)));
         return true; // the disks now belong to the discarded target; nothing left to edit
     }

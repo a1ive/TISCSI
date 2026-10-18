@@ -24,6 +24,14 @@ Optical disc tests serve `.iso` images and files given with `--cdrom`, and
 check the CD/DVD-ROM (MMC) commands. `iso_tool.py` writes small ISO 9660 images from the specification,
 so no mkisofs is needed.
 
+Configuration file tests serve targets from hand-written and saved files
+(UTF-8, UTF-16, ANSI), check errors with line numbers, `--wait` with an image
+that appears later, and `--skip-unavailable`. The GUI test saves a
+configuration through the file dialog and opens it again with `--config`.
+Without administrator rights, the device tests check that every stable name
+`--list` shows finds its disk or volume (opening it then fails, except for
+removable media).
+
 Run from an elevated command prompt to include the device tests: they create
 and attach a 64 MiB VHD with diskpart, serve it with `--disk`, `--volume`,
 `--disk-ro` and `--spti`, and detach it afterwards. The elevated optical test

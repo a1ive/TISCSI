@@ -36,6 +36,10 @@ private:
     void StartOrStop();
     void AddTarget();
     void RemoveTarget();
+    // Replaces the targets and address; restarts the server if it was
+    // running, or starts it if `start`.
+    void OpenConfiguration(const std::wstring& path, bool start);
+    void SaveConfiguration();
     bool ConfirmExit();
 
     App& m_app;

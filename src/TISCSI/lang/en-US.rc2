@@ -13,6 +13,9 @@ IDR_MAINMENU MENU
 BEGIN
     POPUP "&File"
     BEGIN
+        MENUITEM "&Open Configuration...", IDM_FILE_OPEN_CONFIG
+        MENUITEM "&Save Configuration As...", IDM_FILE_SAVE_CONFIG
+        MENUITEM SEPARATOR
         MENUITEM "E&xit", IDM_FILE_EXIT
     END
     POPUP "&View"
@@ -149,7 +152,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "TISCSI"
     IDS_ABOUT_VERSION       "Version {0}"
-    IDS_USAGE               "Command line options:\n\n/log\tWrite a log file to the program directory\n--log=<file>\tWrite a log to the given file\n--lang=<tag>\tUser interface language (en-US, ja-JP, zh-CN, zh-TW, ko-KR)"
+    IDS_USAGE               "Command line options:\n\n/log\tWrite a log file to the program directory\n--log=<file>\tWrite a log to the given file\n--lang=<tag>\tUser interface language (en-US, ja-JP, zh-CN, zh-TW, ko-KR)\n--config=<file>\tOpen a configuration file and start the server"
     IDS_ERR_LOG_FILE        "Cannot open the log file {0}:\n{1}"
 
     IDS_ANY_ADDRESS         "Any"
@@ -212,4 +215,24 @@ BEGIN
     IDS_ERR_AMBIGUOUS_VOLUME "More than one dynamic volume is named {0}."
     IDS_ERR_VOLUME_FAILED   "The dynamic volume {0} cannot be used: disks holding its data are missing."
     IDS_ERR_DEGRADED_WRITE  "The dynamic volume {0} is missing a member disk. Writing to it would leave the members inconsistent; add it read-only."
+    IDS_FILTER_CONFIG       "TISCSI configurations (*.conf)|*.conf|All files (*.*)|*.*|"
+    IDS_ERR_CONFIG_READ     "Cannot read the configuration file {0}:\n{1}"
+    IDS_ERR_CONFIG_LINE     "{0}, line {1}:\n{2}"
+    IDS_ERR_CONFIG_FILE     "{0}:\n{1}"
+    IDS_ERR_CONFIG_SAVE     "Cannot write the configuration file {0}:\n{1}"
+    IDS_ERR_CONFIG_SESSIONS "Initiators are logged in. Disconnect them before opening a configuration."
+    IDS_ERR_CONFIG_TARGETS  "These targets could not be opened and are not served:\n\n{0}"
+    IDS_CONFIRM_UNSTABLE    "These devices have no stable name. They are saved by number or path, which may refer to another device after a restart:\n\n{0}\nSave anyway?"
+    IDS_ERR_CONFIG_UNKNOWN  "Unknown setting: {0}"
+    IDS_ERR_CONFIG_VALUE    "Invalid value for {0}: {1}"
+    IDS_ERR_CONFIG_TARGET_NAME "Invalid iSCSI target name: {0}"
+    IDS_ERR_CONFIG_SPTI_MIXED "Target {0}: spti cannot be combined with disks or another spti."
+    IDS_ERR_CONFIG_NOT_IN_TARGET "{0} must be in a [target <name>] section."
+    IDS_ERR_CONFIG_NOT_IN_SERVER "{0} must be in the [server] section."
+    IDS_ERR_CONFIG_INVALID_LINE "Not a setting or a section: {0}"
+    IDS_ERR_CONFIG_UNKNOWN_SECTION "Unknown section: {0}"
+    IDS_ERR_CONFIG_EMPTY_TARGET "Target {0} has no disks."
+    IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk can only be used with dynamic volumes."
+    IDS_ERR_NO_SUCH_DEVICE  "No device has the name {0}. It may not be connected."
+    IDS_ERR_AMBIGUOUS_DEVICE "More than one device has the name {0}."
 END

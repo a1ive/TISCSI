@@ -53,6 +53,7 @@
     <ClInclude Include="AddTargetDialog.h" />
     <ClInclude Include="App.h" />
     <ClInclude Include="AppSettings.h" />
+    <ClInclude Include="ConfigFiles.h" />
     <ClInclude Include="DiskDialogs.h" />
     <ClInclude Include="MainDialog.h" />
     <ClInclude Include="resource.h" />
@@ -63,6 +64,7 @@
     <ClCompile Include="AddTargetDialog.cpp" />
     <ClCompile Include="App.cpp" />
     <ClCompile Include="AppSettings.cpp" />
+    <ClCompile Include="ConfigFiles.cpp" />
     <ClCompile Include="DiskDialogs.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MainDialog.cpp" />

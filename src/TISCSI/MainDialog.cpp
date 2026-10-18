@@ -5,6 +5,7 @@
 
 #include "AddTargetDialog.h"
 #include "AppSettings.h"
+#include "ConfigFiles.h"
 #include "Common/I18n.h"
 #include "Common/Text.h"
 #include "Core/disk/Device.h"
@@ -18,10 +19,14 @@
 #include <algorithm>
 #include <cstring>
 #include <format>
+#include <utility>
 #include <vector>
 
 namespace tiscsi {
 namespace {
+
+// Posted to itself to open App::startupConfig once the window is shown.
+constexpr UINT WM_APP_OPEN_STARTUP_CONFIG = WM_APP + 2;
 
 // Returns the popup menu that directly contains command `id`.
 HMENU FindSubMenuContaining(HMENU menu, UINT id)
@@ -115,6 +120,12 @@ INT_PTR MainDialog::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_APP_SESSIONS_CHANGED:
         RefreshTargets();
         return TRUE;
+    case WM_APP_OPEN_STARTUP_CONFIG:
+        if (!m_app.startupConfig.empty()) {
+            const std::wstring path = std::exchange(m_app.startupConfig, {});
+            OpenConfiguration(path, true);
+        }
+        return TRUE;
     case WM_CLOSE:
         if (ConfirmExit()) {
             EndDialog(m_dialog, IDOK);
@@ -180,6 +191,9 @@ void MainDialog::OnInit()
     ListView_SetColumnWidth(list, 0, std::max(nameWidth, 60));
     m_app.SetNotifyWindow(m_dialog);
     RefreshTargets();
+    if (!m_app.startupConfig.empty()) {
+        PostMessageW(m_dialog, WM_APP_OPEN_STARTUP_CONFIG, 0, 0);
+    }
 }
 
 void MainDialog::BuildMenu()
@@ -204,15 +218,20 @@ void MainDialog::BuildMenu()
 void MainDialog::FillAddresses()
 {
     HWND combo = GetDlgItem(m_dialog, IDC_ADDRESS);
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
     SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(i18n::Str(IDS_ANY_ADDRESS).c_str()));
     for (const std::wstring& address : LocalAddresses()) {
         SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(address.c_str()));
     }
-    // Keep the previous choice across dialog recreation.
+    // Keep the previous choice across dialog recreation. An address from a
+    // configuration file may not be on this computer (yet): add it.
     int index = 0;
     if (m_app.addressIndex > 0) {
-        const LRESULT found =
+        LRESULT found =
             SendMessageW(combo, CB_FINDSTRINGEXACT, static_cast<WPARAM>(-1), reinterpret_cast<LPARAM>(m_app.addressText.c_str()));
+        if (found == CB_ERR) {
+            found = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(m_app.addressText.c_str()));
+        }
         index = found == CB_ERR ? 0 : static_cast<int>(found);
     }
     SendMessageW(combo, CB_SETCURSEL, index, 0);
@@ -283,6 +302,14 @@ void MainDialog::OnCommand(UINT id)
     case IDC_REMOVE_TARGET:
         RemoveTarget();
         break;
+    case IDM_FILE_OPEN_CONFIG:
+        if (auto path = ui::BrowseForFile(m_dialog, IDS_FILTER_CONFIG, false, nullptr)) {
+            OpenConfiguration(*path, false);
+        }
+        break;
+    case IDM_FILE_SAVE_CONFIG:
+        SaveConfiguration();
+        break;
     case IDM_HELP_ABOUT:
         i18n::DialogBoxParamL(IDD_ABOUT, m_dialog, AboutDialogProc);
         break;
@@ -341,6 +368,47 @@ void MainDialog::RemoveTarget()
         return;
     }
     RefreshTargets();
+}
+
+void MainDialog::OpenConfiguration(const std::wstring& path, bool start)
+{
+    config::ServerConfig config;
+    if (!ReadConfiguration(m_dialog, path, config)) {
+        return;
+    }
+    // Replacing the targets would cut off logged-in initiators.
+    if (m_app.TotalSessions() > 0) {
+        ui::ShowError(m_dialog, i18n::Str(IDS_ERR_CONFIG_SESSIONS));
+        return;
+    }
+    // The address may change: restart the server on the new one.
+    const bool run = start || m_app.running;
+    if (m_app.running) {
+        m_app.Server().Stop();
+        m_app.running = false;
+    }
+    ApplyConfiguration(m_dialog, m_app, config);
+    FillAddresses();
+    SetDlgItemInt(m_dialog, IDC_PORT, m_app.port, FALSE);
+    RefreshTargets();
+    if (run) {
+        StartOrStop();
+    }
+}
+
+void MainDialog::SaveConfiguration()
+{
+    BOOL valid = FALSE;
+    const UINT port = GetDlgItemInt(m_dialog, IDC_PORT, &valid, FALSE);
+    if (!valid || port == 0 || port > 65535) {
+        ui::ShowError(m_dialog, i18n::Str(IDS_ERR_INVALID_PORT));
+        return;
+    }
+    const int index = static_cast<int>(SendDlgItemMessageW(m_dialog, IDC_ADDRESS, CB_GETCURSEL, 0, 0));
+    const std::wstring listen = index <= 0 ? std::wstring() : ui::GetText(m_dialog, IDC_ADDRESS);
+    if (auto path = ui::BrowseForFile(m_dialog, IDS_FILTER_CONFIG, true, L"conf")) {
+        WriteConfiguration(m_dialog, m_app, listen, static_cast<uint16_t>(port), *path);
+    }
 }
 
 bool MainDialog::ConfirmExit()

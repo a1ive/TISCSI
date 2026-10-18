@@ -192,7 +192,9 @@ These are deliberate. Don't "fix" them back to the original behavior.
   needs only a key there (plus the usage text). Saving converts device names
   to stable names (`UseStableName`) and paths to relative ones; loading
   resolves paths against the file's folder. The GUI keeps a `DiskSpec` per
-  LUN for saving.
+  LUN (stable names taken when the disk is chosen, since numbers can change
+  before saving) and the file's other settings in `App::settings`, which it
+  does not use but saves again.
 - Startup (CLI): a target opens with all its disks or not at all, so LUN
   numbers never shift. `--wait` retries failures that may go away
   (`MayAppearLater`: missing device, volume or file) once a second, and a
@@ -246,6 +248,9 @@ These are deliberate. Don't "fix" them back to the original behavior.
   - Volumes on removable media (USB sticks) open read-only without
     administrator rights, so an unprivileged `--volume-ro` can start
     serving; `probe_server` stops it again.
+  - The Vista+ file dialogs have no control 1148 for the file name: it is
+    an Edit inside a ComboBox (`Gui.file_dialog_name_box`).
+  - The only button of an `MB_OK` message box has the ID `IDCANCEL`.
   - Window screenshots taken with `PrintWindow` right after opening a dialog
     can catch it half-painted; wait about 2 s.
 - **Windows 11 (26100) refuses `convert dynamic` on attached VHDs**

@@ -117,8 +117,10 @@ std::wstring ExplainOpenError(const disk::OpenError& error, bool device)
         return i18n::Format(IDS_ERR_VOLUME_FAILED, error.path);
     case disk::OpenError::Problem::DegradedWrite:
         return i18n::Format(IDS_ERR_DEGRADED_WRITE, error.path);
-    case disk::OpenError::Problem::NoSuchDevice: // the GUI names devices by number
+    case disk::OpenError::Problem::NoSuchDevice:
+        return i18n::Format(IDS_ERR_NO_SUCH_DEVICE, error.path);
     case disk::OpenError::Problem::AmbiguousDevice:
+        return i18n::Format(IDS_ERR_AMBIGUOUS_DEVICE, error.path);
     case disk::OpenError::Problem::None:
         // error.path may name a parent or extent file rather than the image itself.
         message = i18n::Format(device ? IDS_ERR_OPEN_DEVICE : IDS_ERR_OPEN_IMAGE, error.path,

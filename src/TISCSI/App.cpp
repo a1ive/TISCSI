@@ -29,7 +29,7 @@ bool App::HasTargetNamed(const std::string& name) const
                        [&](const TargetEntry& entry) { return iscsi::EqualsIgnoreCase(entry.target->Name(), name); });
 }
 
-bool App::AddTarget(std::shared_ptr<iscsi::IscsiTarget> target, size_t lunCount)
+bool App::AddTarget(std::shared_ptr<iscsi::IscsiTarget> target, size_t lunCount, config::TargetSpec spec)
 {
     // Count sessions the way iSCSI Console did: a session starts when the
     // initiator is authorized and ends with the termination notification.
@@ -44,7 +44,7 @@ bool App::AddTarget(std::shared_ptr<iscsi::IscsiTarget> target, size_t lunCount)
     if (!m_server.AddTarget(target)) {
         return false;
     }
-    m_targets.push_back({std::move(target), lunCount});
+    m_targets.push_back({std::move(target), lunCount, std::move(spec)});
     return true;
 }
 

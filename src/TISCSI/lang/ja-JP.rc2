@@ -11,6 +11,9 @@ IDR_MAINMENU MENU
 BEGIN
     POPUP "ファイル(&F)"
     BEGIN
+        MENUITEM "構成を開く(&O)...", IDM_FILE_OPEN_CONFIG
+        MENUITEM "構成に名前を付けて保存(&S)...", IDM_FILE_SAVE_CONFIG
+        MENUITEM SEPARATOR
         MENUITEM "終了(&X)", IDM_FILE_EXIT
     END
     POPUP "表示(&V)"
@@ -151,7 +154,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "TISCSI"
     IDS_ABOUT_VERSION       "バージョン {0}"
-    IDS_USAGE               "コマンド ライン オプション:\n\n/log\tプログラムのフォルダーにログ ファイルを書き込みます\n--log=<ファイル>\t指定したファイルにログを書き込みます\n--lang=<タグ>\t表示言語 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)"
+    IDS_USAGE               "コマンド ライン オプション:\n\n/log\tプログラムのフォルダーにログ ファイルを書き込みます\n--log=<ファイル>\t指定したファイルにログを書き込みます\n--lang=<タグ>\t表示言語 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)\n--config=<ファイル>\t構成ファイルを開いてサーバーを開始します"
     IDS_ERR_LOG_FILE        "ログ ファイル {0} を開けません:\n{1}"
 
     IDS_ANY_ADDRESS         "すべて"
@@ -214,4 +217,24 @@ BEGIN
     IDS_ERR_AMBIGUOUS_VOLUME "{0} という名前のダイナミック ボリュームが複数あります。"
     IDS_ERR_VOLUME_FAILED   "ダイナミック ボリューム {0} は使用できません: データを持つディスクが見つかりません。"
     IDS_ERR_DEGRADED_WRITE  "ダイナミック ボリューム {0} はメンバー ディスクが欠けています。書き込むとメンバー間の整合性が失われるため、読み取り専用で追加してください。"
+    IDS_FILTER_CONFIG       "TISCSI 構成ファイル (*.conf)|*.conf|すべてのファイル (*.*)|*.*|"
+    IDS_ERR_CONFIG_READ     "構成ファイル {0} を読み込めません:\n{1}"
+    IDS_ERR_CONFIG_LINE     "{0} の {1} 行目:\n{2}"
+    IDS_ERR_CONFIG_FILE     "{0}:\n{1}"
+    IDS_ERR_CONFIG_SAVE     "構成ファイル {0} を書き込めません:\n{1}"
+    IDS_ERR_CONFIG_SESSIONS "イニシエーターがログオンしています。構成を開く前に切断してください。"
+    IDS_ERR_CONFIG_TARGETS  "次のターゲットは開けなかったため、提供されません:\n\n{0}"
+    IDS_CONFIRM_UNSTABLE    "次のデバイスには固定名がありません。番号またはパスで保存されるため、再起動後に別のデバイスを指す可能性があります:\n\n{0}\n保存しますか?"
+    IDS_ERR_CONFIG_UNKNOWN  "不明な設定です: {0}"
+    IDS_ERR_CONFIG_VALUE    "{0} の値が無効です: {1}"
+    IDS_ERR_CONFIG_TARGET_NAME "iSCSI ターゲット名が無効です: {0}"
+    IDS_ERR_CONFIG_SPTI_MIXED "ターゲット {0}: spti はディスクや別の spti と組み合わせることはできません。"
+    IDS_ERR_CONFIG_NOT_IN_TARGET "{0} は [target <名前>] セクションに記述してください。"
+    IDS_ERR_CONFIG_NOT_IN_SERVER "{0} は [server] セクションに記述してください。"
+    IDS_ERR_CONFIG_INVALID_LINE "設定でもセクションでもありません: {0}"
+    IDS_ERR_CONFIG_UNKNOWN_SECTION "不明なセクションです: {0}"
+    IDS_ERR_CONFIG_EMPTY_TARGET "ターゲット {0} にディスクがありません。"
+    IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk はダイナミック ボリュームと一緒に使用してください。"
+    IDS_ERR_NO_SUCH_DEVICE  "{0} という名前のデバイスがありません。接続されていない可能性があります。"
+    IDS_ERR_AMBIGUOUS_DEVICE "{0} という名前のデバイスが複数あります。"
 END
