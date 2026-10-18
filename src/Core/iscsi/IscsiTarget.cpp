@@ -4,7 +4,10 @@
 
 #include "Core/iscsi/IscsiTarget.h"
 
+#include "Core/iscsi/IscsiName.h"
 #include "Core/scsi/VirtualScsiTarget.h"
+
+#include <algorithm>
 
 namespace tiscsi::iscsi {
 namespace {
@@ -62,9 +65,19 @@ void IscsiTarget::QueueCommand(const scsi::CdbBytes& cdb, const scsi::LunBytes& 
     m_commandQueue->QueueCommand(cdb, lun, std::move(data), dataInLength, std::move(done));
 }
 
+bool TargetAccess::AllowsInitiator(std::string_view initiatorName) const
+{
+    return allowedInitiators.empty() ||
+           std::any_of(allowedInitiators.begin(), allowedInitiators.end(),
+                       [&](const std::string& allowed) { return EqualsIgnoreCase(allowed, initiatorName); });
+}
+
 bool IscsiTarget::AuthorizeInitiator(const std::string& initiatorName, uint64_t isid,
                                      const std::string& initiatorAddress) const
 {
+    if (!access.AllowsInitiator(initiatorName)) {
+        return false;
+    }
     return onAuthorizationRequest ? onAuthorizationRequest(initiatorName, isid, initiatorAddress) : true;
 }
 

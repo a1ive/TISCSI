@@ -57,7 +57,20 @@ BEGIN
   --lang <标记>        界面语言: en-US、ja-JP、zh-CN、zh-TW 或 ko-KR\n\
                        (默认: Windows 显示语言)\n\
   --help               显示此帮助\n\n"
-    IDS_CLI_USAGE_MORE "配置文件:\n\
+    IDS_CLI_USAGE_MORE "访问控制 (针对当前目标):\n\
+  --allow-initiator <名称>\n\
+                       只有此发起程序可以登录 (可重复指定)；其他发起程序\n\
+                       在发现时看不到该目标\n\
+  --chap-secret <机密>\n\
+                       要求使用此机密进行 CHAP 身份验证 (12 到 255 个字符)\n\
+  --chap-user <名称>   发起程序必须使用的 CHAP 名称 (默认: 任意)\n\
+  --mutual-chap-secret <机密>\n\
+                       用于响应发起程序双向 CHAP 质询的机密\n\
+                       (必须与 --chap-secret 不同)\n\
+  --mutual-chap-user <名称>\n\
+                       目标的 CHAP 名称 (默认: 目标名称)\n\
+                       命令行中的机密可被其他程序看到，建议使用配置文件\n\n\
+配置文件:\n\
   --config <文件>      从文件读取服务器选项、目标和磁盘；同时指定的\n\
                        服务器选项优先于文件中的设置\n\
   --save-config <文件> 不提供服务，而是将目标和选项写入文件；\n\
@@ -114,6 +127,9 @@ Windows 服务 (需要管理员权限):\n\
     IDS_CLI_SERVICE_REMOVED "已删除服务 {0}。"
     IDS_CLI_WARN_NO_WAIT "警告: 配置中没有 wait 设置。Windows 启动时磁盘可能尚未就绪，建议在 [server] 中设置 wait = 60。"
     IDS_CLI_HINT_ADMIN_SERVICE "安装和删除服务需要以管理员身份运行。"
+    IDS_CLI_ACCESS_INITIATORS "  允许的发起程序: {0}"
+    IDS_CLI_ACCESS_CHAP "  需要 CHAP 身份验证"
+    IDS_CLI_ACCESS_MUTUAL_CHAP "  需要 CHAP 身份验证 (支持双向 CHAP)"
     IDS_CLI_LAYOUT_SIMPLE "简单"
     IDS_CLI_LAYOUT_SPANNED "跨区"
     IDS_CLI_LAYOUT_STRIPED "带区"
@@ -178,4 +194,8 @@ Windows 服务 (需要管理员权限):\n\
     IDS_CLI_ERR_SERVICE_START "无法启动服务 {0}: {1}"
     IDS_CLI_ERR_SERVICE_STOPPED "服务 {0} 已停止 (退出代码 {1})。请查看日志: {2}"
     IDS_CLI_ERR_NOT_SERVICE "--service 供 Windows 服务控制管理器使用。请用 --install-service 安装服务。"
+    IDS_CLI_ERR_INVALID_INITIATOR_NAME "iSCSI 发起程序名称无效: {0}"
+    IDS_CLI_ERR_INVALID_SECRET "{0} 的长度必须为 {1} 到 {2} 个字符。"
+    IDS_CLI_ERR_CHAP_INCOMPLETE "目标 {0}: chap-user 和双向 CHAP 设置需要 chap-secret，mutual-chap-user 需要 mutual-chap-secret。"
+    IDS_CLI_ERR_CHAP_SAME_SECRET "目标 {0}: mutual-chap-secret 必须与 chap-secret 不同。"
 END

@@ -59,7 +59,21 @@ VHD 만들기 (디스크도 지정한 경우에만 이어서 서버를 시작합
   --lang <태그>        표시 언어: en-US, ja-JP, zh-CN, zh-TW 또는 ko-KR\n\
                        (기본값: Windows 표시 언어)\n\
   --help               이 도움말을 표시합니다\n\n"
-    IDS_CLI_USAGE_MORE "구성 파일:\n\
+    IDS_CLI_USAGE_MORE "액세스 제어 (현재 대상):\n\
+  --allow-initiator <이름>\n\
+                       이 이니시에이터만 로그온할 수 있습니다 (여러 번 지정 가능).\n\
+                       다른 이니시에이터는 검색에서 대상을 볼 수 없습니다\n\
+  --chap-secret <암호>\n\
+                       이 암호로 CHAP 인증을 요구합니다 (12~255자)\n\
+  --chap-user <이름>   이니시에이터가 사용해야 하는 CHAP 이름 (기본값: 아무 이름)\n\
+  --mutual-chap-secret <암호>\n\
+                       이니시에이터의 상호 CHAP 챌린지에 응답할 암호\n\
+                       (--chap-secret과 달라야 함)\n\
+  --mutual-chap-user <이름>\n\
+                       대상의 CHAP 이름 (기본값: 대상 이름)\n\
+                       명령줄의 암호는 다른 프로그램에서 볼 수 있으므로\n\
+                       구성 파일을 사용하는 것이 좋습니다\n\n\
+구성 파일:\n\
   --config <파일>      서버 옵션, 대상, 디스크를 파일에서 읽습니다. 함께 지정한\n\
                        서버 옵션이 파일의 설정보다 우선합니다\n\
   --save-config <파일> 제공하지 않고 대상과 옵션을 파일에 씁니다.\n\
@@ -117,6 +131,9 @@ Windows 서비스 (관리자 권한 필요):\n\
     IDS_CLI_SERVICE_REMOVED "서비스 {0}을(를) 제거했습니다."
     IDS_CLI_WARN_NO_WAIT "경고: 구성에 wait 설정이 없습니다. Windows가 시작될 때 디스크가 아직 준비되지 않았을 수 있으므로 [server]에 wait = 60 등을 지정하십시오."
     IDS_CLI_HINT_ADMIN_SERVICE "서비스를 설치하고 제거하려면 관리자 권한으로 실행해야 합니다."
+    IDS_CLI_ACCESS_INITIATORS "  허용된 이니시에이터: {0}"
+    IDS_CLI_ACCESS_CHAP "  CHAP 인증 필요"
+    IDS_CLI_ACCESS_MUTUAL_CHAP "  CHAP 인증 필요 (상호 CHAP 지원)"
     IDS_CLI_LAYOUT_SIMPLE "단순"
     IDS_CLI_LAYOUT_SPANNED "스팬"
     IDS_CLI_LAYOUT_STRIPED "스트라이프"
@@ -181,4 +198,8 @@ Windows 서비스 (관리자 권한 필요):\n\
     IDS_CLI_ERR_SERVICE_START "서비스 {0}을(를) 시작할 수 없습니다: {1}"
     IDS_CLI_ERR_SERVICE_STOPPED "서비스 {0}이(가) 중지되었습니다 (종료 코드 {1}). 로그를 확인하십시오: {2}"
     IDS_CLI_ERR_NOT_SERVICE "--service는 Windows 서비스 제어 관리자가 사용합니다. 서비스는 --install-service로 설치하십시오."
+    IDS_CLI_ERR_INVALID_INITIATOR_NAME "잘못된 iSCSI 이니시에이터 이름: {0}"
+    IDS_CLI_ERR_INVALID_SECRET "{0}은(는) {1}~{2}자여야 합니다."
+    IDS_CLI_ERR_CHAP_INCOMPLETE "대상 {0}: chap-user와 상호 CHAP 설정에는 chap-secret이, mutual-chap-user에는 mutual-chap-secret이 필요합니다."
+    IDS_CLI_ERR_CHAP_SAME_SECRET "대상 {0}: mutual-chap-secret은 chap-secret과 달라야 합니다."
 END

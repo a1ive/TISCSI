@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Core/disk/DiskImage.h"
+#include "Core/iscsi/IscsiTarget.h"
 #include "Core/util/Log.h"
 
 #include <cstdint>
@@ -36,6 +37,7 @@ struct TargetSpec {
     std::string name;
     std::vector<DiskSpec> disks;
     std::wstring sptiDevice; // pass-through target (SCSI device selector); excludes disks
+    iscsi::TargetAccess access;
 };
 
 struct ServerConfig {

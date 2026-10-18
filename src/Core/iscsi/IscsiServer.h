@@ -87,6 +87,8 @@ private:
                                    const ConnectionPtr& connection);
     LoginResponse GetFinalLoginResponse(const LoginRequest& request, const util::KeyValueList& parameters,
                                         const ConnectionPtr& connection);
+    // Authentication failure (CHAP), ending the session if it is new.
+    LoginResponse FailAuthentication(LoginResponse& response, util::KeyValueList keys, const ConnectionPtr& connection);
 
     // Caller must hold m_targetsMutex.
     std::shared_ptr<IscsiTarget> FindTargetLocked(const std::string& targetName) const;

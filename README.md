@@ -155,6 +155,34 @@ its disks or not at all, so LUN numbers never shift. Without
 `skip-unavailable = yes` (`--skip-unavailable`) nothing is served if a target
 cannot be opened.
 
+### Access control
+
+By default every initiator may log in to every target. Per target (after its
+`--target`, or in its `[target]` section):
+
+```ini
+[target iqn.2026-10.example:pc01]
+allow-initiator = iqn.1991-05.com.microsoft:pc01
+chap-user = pc01
+chap-secret = 12-to-255-chars
+mutual-chap-secret = another-secret
+image = pc01.vhd
+```
+
+- `allow-initiator` (repeatable): only these initiators may log in, and the
+  others do not see the target in discovery. Initiators choose their own
+  names, so this keeps out mistakes rather than attackers.
+- `chap-secret`: CHAP authentication (MD5) is required. `chap-user` is the
+  name the initiator must use (any if not set). The Microsoft iSCSI Initiator
+  wants a secret of 12 to 16 characters.
+- `mutual-chap-secret`: lets an initiator that asks for mutual CHAP check the
+  target too; it must differ from `chap-secret`. The target answers with
+  `mutual-chap-user`, or its name.
+
+Secrets are stored in the configuration file as written, so keep it where
+only administrators can read it; on the command line, other programs can see
+them.
+
 ### Windows service
 
 To serve a configuration from Windows startup on, before anyone logs on,

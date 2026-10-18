@@ -52,6 +52,14 @@ std::wstring ConfigErrorText(const config::ConfigError& error)
         return i18n::Format(IDS_ERR_CONFIG_EMPTY_TARGET, error.value);
     case Code::LdmUnused:
         return i18n::Str(IDS_ERR_CONFIG_LDM_UNUSED);
+    case Code::InvalidInitiatorName:
+        return i18n::Format(IDS_ERR_CONFIG_INITIATOR_NAME, error.value);
+    case Code::InvalidSecret:
+        return i18n::Format(IDS_ERR_CONFIG_SECRET, error.option, config::kMinChapSecret, config::kMaxChapSecret);
+    case Code::ChapIncomplete:
+        return i18n::Format(IDS_ERR_CONFIG_CHAP_INCOMPLETE, error.value);
+    case Code::ChapSameSecret:
+        return i18n::Format(IDS_ERR_CONFIG_CHAP_SAME_SECRET, error.value);
     }
     return {};
 }
@@ -90,6 +98,7 @@ std::wstring OpenTarget(App& app, const config::TargetSpec& spec, const std::vec
         lunCount = disks.size();
         target = std::make_shared<iscsi::IscsiTarget>(spec.name, std::move(disks), app.ScsiLogger());
     }
+    target->access = spec.access;
     if (!app.AddTarget(std::move(target), lunCount, spec)) {
         return i18n::Format(IDS_ERR_TARGET_EXISTS, text::Utf8ToWide(spec.name));
     }

@@ -378,6 +378,7 @@ OpenResult OpenTarget(const config::TargetSpec& spec, const config::ServerConfig
         const std::wstring device = path == spec.sptiDevice ? path : std::format(L"{} ({})", spec.sptiDevice, path);
         luns.push_back({i18n::Format(IDS_CLI_SPTI, device, spti->LunCount()), 0, false});
         opened.target = std::make_shared<iscsi::IscsiTarget>(spec.name, std::move(spti));
+        opened.target->access = spec.access;
         opened.luns = std::move(luns);
         opened.passThrough = true;
         return OpenResult::Opened;
@@ -403,6 +404,7 @@ OpenResult OpenTarget(const config::TargetSpec& spec, const config::ServerConfig
     }
     opened.target = std::make_shared<iscsi::IscsiTarget>(spec.name, std::move(disks),
                                                          util::Logger("Virtual SCSI Target", sink));
+    opened.target->access = spec.access;
     opened.luns = std::move(luns);
     opened.passThrough = false;
     return OpenResult::Opened;
@@ -516,6 +518,17 @@ int Run(const cli::Options& options, LogFile* serviceLog = nullptr)
     cli::PrintLine(i18n::Format(IDS_CLI_LISTENING, options.server.addressText, options.server.port));
     for (const OpenedTarget& target : opened) {
         cli::PrintLine(i18n::Format(IDS_CLI_TARGET, cli::Utf8ToWide(target.target->Name())));
+        const iscsi::TargetAccess& access = target.target->access;
+        if (!access.allowedInitiators.empty()) {
+            std::wstring names;
+            for (const std::string& name : access.allowedInitiators) {
+                names += (names.empty() ? L"" : L", ") + cli::Utf8ToWide(name);
+            }
+            cli::PrintLine(i18n::Format(IDS_CLI_ACCESS_INITIATORS, names));
+        }
+        if (access.RequiresChap()) {
+            cli::PrintLine(i18n::Str(access.mutualSecret.empty() ? IDS_CLI_ACCESS_CHAP : IDS_CLI_ACCESS_MUTUAL_CHAP));
+        }
         if (target.passThrough) {
             cli::PrintLine(target.luns.front().description);
             continue;

@@ -229,6 +229,21 @@ LoginStatus IscsiServer::SetUpNormalSession(const LoginRequest& request, const s
     return LoginStatus::Success;
 }
 
+LoginResponse IscsiServer::FailAuthentication(LoginResponse& response, util::KeyValueList keys,
+                                              const ConnectionPtr& connection)
+{
+    response.transit = false;
+    response.status = LoginStatus::AuthenticationFailure;
+    response.text = keys.ToNullDelimited();
+    // A new session ends here; do not keep it (and its target's session
+    // count) until it expires. An added connection leaves its session alone.
+    const SessionPtr session = connection->GetSession();
+    if (m_connectionManager.GetSessionConnections(session).empty()) {
+        m_sessionManager.RemoveSession(session, SessionTerminationReason::ConnectionFailure);
+    }
+    return response;
+}
+
 LoginResponse IscsiServer::GetFinalLoginResponse(const LoginRequest& request, const util::KeyValueList& parameters,
                                                  const ConnectionPtr& connection)
 {
@@ -241,14 +256,30 @@ LoginResponse IscsiServer::GetFinalLoginResponse(const LoginRequest& request, co
     // Two optional stages, at least one of which must be present: security
     // negotiation (0) and operational parameter negotiation (1), then the
     // full feature phase (3).
+    const bool requiresChap = session->target && session->target->access.RequiresChap();
     if (request.currentStage == kSecurityNegotiation) {
         util::KeyValueList responseParameters;
-        responseParameters.Add("AuthMethod", "None");
-        if (session->target) {
+        bool authenticated = true;
+        if (requiresChap) {
+            ChapResult chap = ChapStep(connection->chap, session->target->access, session->target->Name(), parameters);
+            if (chap.outcome == ChapResult::Outcome::Failed) {
+                m_log.Log(Severity::Warning, "[{}] CHAP authentication failed: {}", connection->Identifier(), chap.reason);
+                return FailAuthentication(response, std::move(chap.response), connection);
+            }
+            responseParameters = std::move(chap.response);
+            authenticated = chap.outcome == ChapResult::Outcome::Done;
+        } else {
+            responseParameters.Add("AuthMethod", "None");
+        }
+        if (session->target && !connection->sentTargetPortalGroupTag) {
             // Returned with the first Login Response that may carry it.
             responseParameters.Add("TargetPortalGroupTag", "1");
+            connection->sentTargetPortalGroupTag = true;
         }
-        if (request.transit) {
+        if (request.transit && !authenticated) {
+            // The CHAP exchange goes on in this stage.
+            response.transit = false;
+        } else if (request.transit) {
             if (request.nextStage == kFullFeaturePhase) {
                 connection->isFullFeaturePhase = true;
                 session->isFullFeaturePhase = true;
@@ -260,6 +291,11 @@ LoginResponse IscsiServer::GetFinalLoginResponse(const LoginRequest& request, co
         }
         response.text = responseParameters.ToNullDelimited();
     } else if (request.currentStage == kLoginOperationalNegotiation) {
+        if (requiresChap && connection->chap.step != ChapExchange::Step::Done) {
+            m_log.Log(Severity::Warning, "[{}] CHAP authentication failed: the initiator skipped security negotiation",
+                      connection->Identifier());
+            return FailAuthentication(response, {}, connection);
+        }
         UpdateOperationalParameters(parameters, *connection, *session);
         response.text = GetLoginResponseOperationalParameters(*connection, *session).ToNullDelimited();
         if (request.transit) {

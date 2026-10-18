@@ -157,6 +157,9 @@ These are deliberate. Don't "fix" them back to the original behavior.
   check box), are served as read-only CD/DVD-ROM drives (iSCSI Console has
   no optical support; its PRs #9 / #10 were never merged and were not
   ported). Every LUN also takes MODE SENSE (10) and READ / WRITE (12).
+- Targets can restrict access (`iscsi::TargetAccess`): allowed initiator
+  names, also applied to SendTargets, and CHAP / mutual CHAP. iSCSI Console
+  let every initiator in and only ever answered `AuthMethod=None`.
 
 ## Design notes
 
@@ -208,6 +211,11 @@ These are deliberate. Don't "fix" them back to the original behavior.
   stops with `Run`'s exit code as the service-specific error. It has no
   console: `cli::SetOutputSink` sends the console output to the log, in
   English.
+- CHAP (`iscsi/Chap.cpp`) runs per connection in the security stage: the
+  target answers T=0 until CHAP_N / CHAP_R check out, refuses initiators
+  that skip the stage or reflect its challenge, and removes a new session
+  at once on failure (otherwise it would count until Time2Retain). MD5 and
+  random numbers come from CryptoAPI. Secrets never go to the log.
 - Volumes are served through the OS volume handle, which also covers
   dynamic volumes Windows has mounted.
 - Dynamic volumes: the LDM volume GUID is the Windows volume GUID. A volume
@@ -282,6 +290,11 @@ These are deliberate. Don't "fix" them back to the original behavior.
   disks; so far only `ldm_tool.py` images are covered.
 - GUI flows that need administrator rights are not automated: adding
   physical disks, volumes and unmounted dynamic volumes.
+- The GUI applies and saves the access settings (allowed initiators, CHAP)
+  of opened configuration files but cannot edit them yet.
+- CHAP is checked against this repository's test initiator and (elevated
+  optical test) the Microsoft initiator's one-way CHAP; mutual CHAP with
+  the Microsoft or Linux initiator has not been tried.
 - Manual checks on XP / Windows 7, including the CJK font fallback (SimSun,
   PMingLiU, Gulim on XP).
 - Not supported: compressed (streamOptimized) VMDK, VMFSSPARSE / SESPARSE,

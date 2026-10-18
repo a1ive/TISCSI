@@ -32,6 +32,12 @@ Without administrator rights, the device tests check that every stable name
 `--list` shows finds its disk or volume (opening it then fails, except for
 removable media).
 
+Access tests cover allowed initiators (also in discovery) and CHAP:
+`initiator.py` logs in with one-way and mutual CHAP, and with the mistakes
+the target must refuse (no CHAP, skipped security stage, wrong name or
+secret, reflected challenge, unsupported algorithm). The elevated optical
+test also logs the Microsoft initiator in with one-way CHAP.
+
 The elevated service test installs a service named `TISCSI-Test-<pid>`, serves
 a configuration through it, checks its log, updates it, lets it fail on a
 broken configuration, and removes it.

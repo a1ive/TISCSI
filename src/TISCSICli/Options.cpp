@@ -121,6 +121,14 @@ std::wstring ConfigErrorMessage(const ConfigError& error)
         return i18n::Format(IDS_CLI_ERR_TARGET_WITHOUT_DISKS, error.value);
     case Code::LdmUnused:
         return i18n::Str(IDS_CLI_ERR_LDM_UNUSED);
+    case Code::InvalidInitiatorName:
+        return i18n::Format(IDS_CLI_ERR_INVALID_INITIATOR_NAME, error.value);
+    case Code::InvalidSecret:
+        return i18n::Format(IDS_CLI_ERR_INVALID_SECRET, error.option, config::kMinChapSecret, config::kMaxChapSecret);
+    case Code::ChapIncomplete:
+        return i18n::Format(IDS_CLI_ERR_CHAP_INCOMPLETE, error.value);
+    case Code::ChapSameSecret:
+        return i18n::Format(IDS_CLI_ERR_CHAP_SAME_SECRET, error.value);
     }
     return {};
 }

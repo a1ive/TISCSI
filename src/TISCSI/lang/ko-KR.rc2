@@ -237,4 +237,8 @@ BEGIN
     IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk는 동적 볼륨과 함께 사용해야 합니다."
     IDS_ERR_NO_SUCH_DEVICE  "이름이 {0}인 장치가 없습니다. 연결되어 있지 않을 수 있습니다."
     IDS_ERR_AMBIGUOUS_DEVICE "이름이 {0}인 장치가 여러 개 있습니다."
+    IDS_ERR_CONFIG_INITIATOR_NAME "잘못된 iSCSI 이니시에이터 이름: {0}"
+    IDS_ERR_CONFIG_SECRET   "{0}은(는) {1}~{2}자여야 합니다."
+    IDS_ERR_CONFIG_CHAP_INCOMPLETE "대상 {0}: chap-user와 상호 CHAP 설정에는 chap-secret이, mutual-chap-user에는 mutual-chap-secret이 필요합니다."
+    IDS_ERR_CONFIG_CHAP_SAME_SECRET "대상 {0}: mutual-chap-secret은 chap-secret과 달라야 합니다."
 END

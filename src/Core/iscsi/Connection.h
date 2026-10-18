@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "Core/iscsi/Chap.h"
 #include "Core/iscsi/Parameters.h"
 #include "Core/iscsi/Pdu.h"
 #include "Core/iscsi/Session.h"
@@ -69,6 +70,10 @@ public:
     const uint32_t targetMaxRecvDataSegmentLength = declared::kMaxRecvDataSegmentLength;
 
     uint32_t statSN = 0; // sender thread only; any initial value will do
+
+    // Login (receive thread).
+    ChapExchange chap;
+    bool sentTargetPortalGroupTag = false;
 
     util::BlockingQueue<Pdu> sendQueue;
     util::CountdownLatch runningCommands;

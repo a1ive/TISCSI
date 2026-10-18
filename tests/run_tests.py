@@ -939,6 +939,99 @@ def test_config_files(ctx):
     ctx.check(rc == 2 and "None of the targets can be served" in out, "--skip-unavailable with nothing left fails")
 
 
+# ---- Access control ------------------------------------------------------------
+
+def test_access(ctx):
+    allowed, chap, oneway = "iqn.2026-10.test:allowed", "iqn.2026-10.test:chap", "iqn.2026-10.test:oneway"
+    other = "iqn.2026-10.test:other-initiator"
+    secret, mutual = "alice-secret-1", "target-secret-2"
+    args = ["--target", allowed, "--allow-initiator", "IQN.2026-10.TEST:INITIATOR", "--ram", "1M",
+            "--target", chap, "--chap-user", "alice", "--chap-secret", secret, "--mutual-chap-secret", mutual,
+            "--ram", "1M",
+            "--target", oneway, "--chap-secret", "oneway-secret", "--ram", "1M"]
+    with Server(ctx, args) as server:
+        s = ctx.session()
+        ctx.check(s.full_login(allowed)[0] == 0, "an allowed initiator logs in (names compare without case)")
+        s.logout()
+        s = Session(HOST, ctx.port, initiator=other)
+        ctx.check(s.full_login(allowed)[0] == 0x0202, "another initiator is refused (authorization failure)")
+        s.close()
+        s = Session(HOST, ctx.port, initiator=other)
+        s.full_login()
+        _, keys = s.text([("SendTargets", "All")])
+        ctx.check(sorted(keys.get("TargetName", [])) == sorted([chap, oneway]),
+                  "discovery hides targets the initiator may not log in to")
+        s.logout()
+
+        s = ctx.session()
+        _, status, _, _ = s.login([("InitiatorName", s.initiator), ("SessionType", "Normal"), ("TargetName", chap),
+                                   ("AuthMethod", "None")], 0, 1)
+        ctx.check(status == 0x0201, "a CHAP target refuses AuthMethod=None (authentication failure)")
+        s.close()
+        s = ctx.session()
+        ctx.check(s.full_login(chap)[0] == 0x0201, "a CHAP target refuses initiators that skip security negotiation")
+        s.close()
+        s = ctx.session()
+        status, details = s.chap_login(chap, "alice", secret)
+        st, size, _ = s.capacity() if status == 0 else (None, 0, 0)
+        ctx.check(status == 0 and size == MiB, "the right CHAP name and secret log in")
+        s.logout()
+        for name, key, what in (("alice", "wrong-secret-0", "a wrong secret"), ("bob", secret, "a wrong CHAP name")):
+            s = ctx.session()
+            ctx.check(s.chap_login(chap, name, key)[0] == 0x0201, f"{what} is refused")
+            s.close()
+        s = ctx.session()
+        status, details = s.chap_login(chap, "alice", secret, mutual_secret=mutual)
+        ctx.check(status == 0 and details["mutual_ok"] and details["target_name"] == chap,
+                  "mutual CHAP: the target proves it knows the mutual secret, with its name as CHAP_N")
+        s.logout()
+        s = ctx.session()
+        ctx.check(s.chap_login(chap, "alice", secret, mutual_secret=mutual, reflect=True)[0] == 0x0201,
+                  "mutual CHAP refuses the target's own challenge (reflection)")
+        s.close()
+        s = ctx.session()
+        status, details = s.chap_login(chap, "alice", secret, algorithms="7")
+        ctx.check(status == 0x0201 and details["keys"].get("CHAP_A") == ["Reject"],
+                  "an unsupported CHAP algorithm is rejected")
+        s.close()
+        s = ctx.session()
+        ctx.check(s.chap_login(oneway, "anyone", "oneway-secret", base64=True)[0] == 0,
+                  "without chap-user any CHAP name works; base64 (0b) responses are accepted")
+        s.logout()
+        s = ctx.session()
+        ctx.check(s.chap_login(oneway, "anyone", "oneway-secret", mutual_secret="x" * 12)[0] == 0x0201,
+                  "mutual CHAP without a mutual secret on the target is refused")
+        s.close()
+        server.stop()
+    ctx.check("Allowed initiators: IQN.2026-10.TEST:INITIATOR" in server.output and
+              "CHAP authentication required; mutual CHAP available" in server.output and
+              "CHAP authentication failed" in server.output and secret not in server.output,
+              "the server shows each target's access and logs failures, without secrets")
+
+    # Configuration files keep the settings.
+    saved = ctx.path("access.conf")
+    rc, _ = run_cli(ctx, *args, "--save-config", saved)
+    text = open(saved, encoding="utf-8-sig").read() if rc == 0 else ""
+    ctx.check(f"[target {chap}]\nchap-user = alice\nchap-secret = {secret}\nmutual-chap-secret = {mutual}\nram = 1M\n"
+              in text.replace("\r\n", "\n") and "allow-initiator = IQN.2026-10.TEST:INITIATOR" in text,
+              "--save-config writes the access settings")
+    with Server(ctx, ["--config", saved]):
+        s = ctx.session()
+        ctx.check(s.full_login(chap)[0] == 0x0201, "a saved CHAP target still needs CHAP")
+        s.close()
+        s = ctx.session()
+        ctx.check(s.chap_login(chap, "alice", secret)[0] == 0, "and logs in with it")
+        s.logout()
+    for extra, expected in ((["--chap-secret", "short"], "--chap-secret must be 12 to 255 characters long"),
+                            (["--chap-user", "alice"], "chap-user and the mutual CHAP settings need chap-secret"),
+                            (["--chap-secret", secret, "--mutual-chap-secret", secret], "must differ from chap-secret"),
+                            (["--chap-secret", secret, "--mutual-chap-user", "t"], "mutual-chap-user needs"),
+                            (["--allow-initiator", "not-an-iqn"], "Invalid iSCSI initiator name: not-an-iqn")):
+        rc, out = run_cli(ctx, "--target", chap, "--ram", "1M", *extra)
+        ctx.check(rc == 1 and expected in out and (secret not in out or "--mutual" in " ".join(extra)),
+                  f"access error: {expected}")
+
+
 # ---- Windows service ---------------------------------------------------------
 
 def test_service(ctx):
@@ -1037,6 +1130,9 @@ def test_optical_elevated(ctx):
     cd = iso_tool.make_iso(ctx.path("win-cd.iso"), files, "TISCSI_CD")
     dvd = iso_tool.make_iso(ctx.path("win-dvd.iso"), files, "TISCSI_DVD")
     make_sparse(dvd, DVD_SECTORS * 2048)
+    chap_target = "iqn.2026-10.test:optical-chap"
+    chap_cd = iso_tool.make_iso(ctx.path("win-chap.iso"), files, "TISCSI_CHAP")
+    chap_secret = "ms-secret-1234"  # the Microsoft initiator wants 12 to 16 characters
 
     _, status = powershell("(Get-Service MSiSCSI).Status")
     started_service = status != "Running"
@@ -1048,7 +1144,9 @@ def test_optical_elevated(ctx):
             return
     portal = f"-TargetPortalAddress {HOST} -TargetPortalPortNumber {ctx.port}"
     try:
-        with Server(ctx, ["--target", target, "--image-ro", cd, "--image-ro", dvd]):
+        with Server(ctx, ["--target", target, "--image-ro", cd, "--image-ro", dvd,
+                          "--target", chap_target, "--chap-user", "msuser", "--chap-secret", chap_secret,
+                          "--cdrom", chap_cd]):
             rc, out = powershell(f"New-IscsiTargetPortal {portal} | Out-Null; "
                                  f"Connect-IscsiTarget -NodeAddress {target} {portal} | Out-Null")
             ctx.check(rc == 0, "Microsoft iSCSI Initiator logs in")
@@ -1067,8 +1165,22 @@ def test_optical_elevated(ctx):
                 _, out = powershell("Get-CimInstance Win32_CDROMDrive | Where-Object Caption -like 'TISCSI*' | "
                                     "ForEach-Object { \"$($_.Caption)|$($_.MediaLoaded)\" }")
                 ctx.check(out.count("|True") == 2, f"Win32_CDROMDrive lists both drives with media ({out!r})")
+
+                # CHAP with the Microsoft initiator.
+                rc, _ = powershell(f"Connect-IscsiTarget -NodeAddress {chap_target} {portal} | Out-Null")
+                ctx.check(rc != 0, "Microsoft iSCSI Initiator without CHAP is refused by a CHAP target")
+                rc, out = powershell(f"Connect-IscsiTarget -NodeAddress {chap_target} {portal} "
+                                     f"-AuthenticationType ONEWAYCHAP -ChapUsername msuser -ChapSecret {chap_secret} "
+                                     "| Out-Null")
+                ctx.check(rc == 0, "Microsoft iSCSI Initiator logs in with CHAP")
+                if rc:
+                    print(out)
+                drive = find_cd_volume("TISCSI_CHAP") if rc == 0 else None
+                text = open(drive + "\\HELLO.TXT", "rb").read() if drive else b""
+                ctx.check(text == hello, "TISCSI_CHAP: files read back through CDFS")
             finally:
                 powershell(f"Disconnect-IscsiTarget -NodeAddress {target} -Confirm:$false")
+                powershell(f"Disconnect-IscsiTarget -NodeAddress {chap_target} -Confirm:$false")
                 powershell(f"Remove-IscsiTargetPortal {portal} -Confirm:$false")
     finally:
         if started_service:
@@ -1773,7 +1885,7 @@ def test_gui(ctx):
         broken = ctx.path("gui broken.conf")
         with open(broken, "w", encoding="utf-8") as f:
             f.write(f"[server]\nport = {ctx.port}\n[target iqn.2026-10.test:missing]\nimage = {ctx.path('missing.img')}\n"
-                    f"[target {TARGET}]\nram = 1M\n")
+                    f"[target {TARGET}]\nchap-secret = gui-secret-12\nram = 1M\n")
         gui.close()
         gui = Gui(gui_exe, ["--lang=en-US", "--config", broken])
         box = gui.top_window()
@@ -1793,7 +1905,11 @@ def test_gui(ctx):
             except OSError:
                 time.sleep(0.2)
         s = ctx.session()
-        ctx.check(s.full_login(TARGET)[0] == 0, "the other targets of the configuration are served")
+        ctx.check(s.full_login(TARGET)[0] == 0x0201, "the GUI applies the configuration's CHAP setting")
+        s.close()
+        s = ctx.session()
+        ctx.check(s.chap_login(TARGET, "gui", "gui-secret-12")[0] == 0,
+                  "the other targets of the configuration are served")
         s.logout()
         gui.user32.PostMessageW(main, Gui.WM_CLOSE, 0, 0)
         gui.process.wait(timeout=10)
@@ -1809,7 +1925,7 @@ def test_gui(ctx):
 
 TESTS = [test_cli_errors, test_protocol, test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
          test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_optical_images,
-         test_config_files, test_service, test_service_elevated, test_optical_elevated, test_devices_unprivileged,
+         test_config_files, test_access, test_service, test_service_elevated, test_optical_elevated, test_devices_unprivileged,
          test_devices_elevated, test_dynamic_volumes, test_dynamic_volumes_elevated, test_gui]
 
 

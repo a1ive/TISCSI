@@ -176,7 +176,8 @@ bool ConfigBuilder::IsServerKey(std::wstring_view key)
 bool ConfigBuilder::IsTargetKey(std::wstring_view key)
 {
     for (std::wstring_view name : {L"image", L"image-ro", L"cdrom", L"ram", L"disk", L"disk-ro", L"volume", L"volume-ro",
-                                   L"dynamic-volume", L"dynamic-volume-ro", L"spti"}) {
+                                   L"dynamic-volume", L"dynamic-volume-ro", L"spti", L"allow-initiator", L"chap-user",
+                                   L"chap-secret", L"mutual-chap-user", L"mutual-chap-secret"}) {
         if (key == name) {
             return true;
         }
@@ -339,6 +340,29 @@ ConfigError ConfigBuilder::Apply(std::wstring_view key, std::wstring_view value)
             return Error(Code::SptiMixed, key, FromUtf8(target->name));
         }
         target->sptiDevice = value;
+    } else {
+        // Who may log in to the target.
+        TargetSpec* target = nullptr;
+        if (ConfigError error = CurrentTarget(key, target)) {
+            return error;
+        }
+        iscsi::TargetAccess& access = target->access;
+        const std::string utf8 = util::ToUtf8(value);
+        if (key == L"allow-initiator") {
+            if (!iscsi::IsValidIscsiName(utf8)) {
+                return Error(Code::InvalidInitiatorName, key, value);
+            }
+            access.allowedInitiators.push_back(utf8);
+        } else if (key == L"chap-user") {
+            access.chapUser = utf8;
+        } else if (key == L"mutual-chap-user") {
+            access.mutualUser = utf8;
+        } else {
+            if (utf8.size() < kMinChapSecret || utf8.size() > kMaxChapSecret) {
+                return Error(Code::InvalidSecret, key); // not the secret itself
+            }
+            (key == L"chap-secret" ? access.chapSecret : access.mutualSecret) = utf8;
+        }
     }
     return {};
 }
@@ -350,6 +374,18 @@ ConfigError Validate(const ServerConfig& config, bool requireTargets)
     for (const TargetSpec& target : config.targets) {
         if (target.disks.empty() && target.sptiDevice.empty()) {
             return Error(Code::TargetWithoutDisks, {}, FromUtf8(target.name));
+        }
+        const iscsi::TargetAccess& access = target.access;
+        if (access.chapSecret.empty() &&
+            (!access.chapUser.empty() || !access.mutualUser.empty() || !access.mutualSecret.empty())) {
+            return Error(Code::ChapIncomplete, {}, FromUtf8(target.name));
+        }
+        if (!access.mutualUser.empty() && access.mutualSecret.empty()) {
+            return Error(Code::ChapIncomplete, {}, FromUtf8(target.name));
+        }
+        // RFC 3720 11.1.4: the two directions must use different secrets.
+        if (!access.mutualSecret.empty() && access.mutualSecret == access.chapSecret) {
+            return Error(Code::ChapSameSecret, {}, FromUtf8(target.name));
         }
     }
     if (!config.ldmImages.empty()) {
@@ -461,6 +497,17 @@ std::wstring FormatConfig(const ServerConfig& config, const std::wstring& baseDi
     }
     for (const TargetSpec& target : config.targets) {
         text += std::format(L"\r\n[target {}]\r\n", FromUtf8(target.name));
+        const iscsi::TargetAccess& access = target.access;
+        for (const std::string& initiator : access.allowedInitiators) {
+            AddLine(text, L"allow-initiator", FromUtf8(initiator));
+        }
+        for (const auto& [key, value] : {std::pair{L"chap-user", &access.chapUser}, {L"chap-secret", &access.chapSecret},
+                                         {L"mutual-chap-user", &access.mutualUser},
+                                         {L"mutual-chap-secret", &access.mutualSecret}}) {
+            if (!value->empty()) {
+                AddLine(text, key, FromUtf8(*value));
+            }
+        }
         if (!target.sptiDevice.empty()) {
             AddLine(text, L"spti", target.sptiDevice);
         }

@@ -60,7 +60,21 @@ VHD の作成 (ディスクも指定した場合のみ、続けてサーバー�
   --lang <タグ>        表示言語: en-US、ja-JP、zh-CN、zh-TW、ko-KR\n\
                        (既定: Windows の表示言語)\n\
   --help               このヘルプを表示します\n\n"
-    IDS_CLI_USAGE_MORE "構成ファイル:\n\
+    IDS_CLI_USAGE_MORE "アクセス制御 (現在のターゲット):\n\
+  --allow-initiator <名前>\n\
+                       このイニシエーターだけがログオンできます (複数指定可)。\n\
+                       ほかのイニシエーターには探索でターゲットが表示されません\n\
+  --chap-secret <シークレット>\n\
+                       このシークレットによる CHAP 認証を必須にします (12～255 文字)\n\
+  --chap-user <名前>   イニシエーターが使う CHAP 名 (既定: 任意)\n\
+  --mutual-chap-secret <シークレット>\n\
+                       イニシエーターの相互 CHAP チャレンジに応答するシークレット\n\
+                       (--chap-secret とは別の値にしてください)\n\
+  --mutual-chap-user <名前>\n\
+                       ターゲットの CHAP 名 (既定: ターゲット名)\n\
+                       コマンド ラインのシークレットはほかのプログラムから見える\n\
+                       ため、構成ファイルを使うことをお勧めします\n\n\
+構成ファイル:\n\
   --config <ファイル>  サーバー オプション、ターゲット、ディスクをファイルから\n\
                        読み込みます。同時に指定したサーバー オプションが優先されます\n\
   --save-config <ファイル>\n\
@@ -119,6 +133,9 @@ Windows サービス (管理者権限が必要です):\n\
     IDS_CLI_SERVICE_REMOVED "サービス {0} を削除しました。"
     IDS_CLI_WARN_NO_WAIT "警告: 構成に wait の設定がありません。Windows の起動時にはディスクの準備ができていない可能性があります。[server] に wait = 60 などを指定してください。"
     IDS_CLI_HINT_ADMIN_SERVICE "サービスのインストールと削除には管理者として実行する必要があります。"
+    IDS_CLI_ACCESS_INITIATORS "  許可されたイニシエーター: {0}"
+    IDS_CLI_ACCESS_CHAP "  CHAP 認証が必要です"
+    IDS_CLI_ACCESS_MUTUAL_CHAP "  CHAP 認証が必要です (相互 CHAP 対応)"
     IDS_CLI_LAYOUT_SIMPLE "シンプル"
     IDS_CLI_LAYOUT_SPANNED "スパン"
     IDS_CLI_LAYOUT_STRIPED "ストライプ"
@@ -183,4 +200,8 @@ Windows サービス (管理者権限が必要です):\n\
     IDS_CLI_ERR_SERVICE_START "サービス {0} を開始できません: {1}"
     IDS_CLI_ERR_SERVICE_STOPPED "サービス {0} が停止しました (終了コード {1})。ログを確認してください: {2}"
     IDS_CLI_ERR_NOT_SERVICE "--service は Windows のサービス コントロール マネージャーが使用します。サービスは --install-service でインストールしてください。"
+    IDS_CLI_ERR_INVALID_INITIATOR_NAME "iSCSI イニシエーター名が無効です: {0}"
+    IDS_CLI_ERR_INVALID_SECRET "{0} は {1}～{2} 文字にしてください。"
+    IDS_CLI_ERR_CHAP_INCOMPLETE "ターゲット {0}: chap-user と相互 CHAP の設定には chap-secret が、mutual-chap-user には mutual-chap-secret が必要です。"
+    IDS_CLI_ERR_CHAP_SAME_SECRET "ターゲット {0}: mutual-chap-secret は chap-secret と別の値にしてください。"
 END

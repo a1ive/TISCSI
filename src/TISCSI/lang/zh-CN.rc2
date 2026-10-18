@@ -237,4 +237,8 @@ BEGIN
     IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk 只能与动态卷一起使用。"
     IDS_ERR_NO_SUCH_DEVICE  "没有名为 {0} 的设备，它可能未连接。"
     IDS_ERR_AMBIGUOUS_DEVICE "有多个设备名为 {0}。"
+    IDS_ERR_CONFIG_INITIATOR_NAME "iSCSI 发起程序名称无效: {0}"
+    IDS_ERR_CONFIG_SECRET   "{0} 的长度必须为 {1} 到 {2} 个字符。"
+    IDS_ERR_CONFIG_CHAP_INCOMPLETE "目标 {0}: chap-user 和双向 CHAP 设置需要 chap-secret，mutual-chap-user 需要 mutual-chap-secret。"
+    IDS_ERR_CONFIG_CHAP_SAME_SECRET "目标 {0}: mutual-chap-secret 必须与 chap-secret 不同。"
 END

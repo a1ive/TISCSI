@@ -415,9 +415,12 @@ TextResponse IscsiServer::GetTextResponse(const TextRequest& request, const Conn
     util::KeyValueList result;
     // Text keys are case sensitive.
     if (parameters.Contains("SendTargets")) {
+        // Only the targets this initiator may log in to.
         std::lock_guard lock(m_targetsMutex);
         for (const auto& target : m_targets) {
-            result.Add("TargetName", target->Name());
+            if (target->access.AllowsInitiator(session->initiatorName)) {
+                result.Add("TargetName", target->Name());
+            }
         }
     } else if (session->isDiscovery || !IsVendorSpecificRequest(parameters)) {
         for (const auto& [key, value] : parameters) {

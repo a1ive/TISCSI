@@ -15,7 +15,9 @@
 //   disk-ro = serial:WD-WCC4N0123456
 //
 // Keys are the long option names without "--" (skip-unavailable takes yes or
-// no); each disk key adds the next LUN of its target. Lines starting with #
+// no); each disk key adds the next LUN of its target. A target section may
+// also restrict who logs in: allow-initiator (repeatable), chap-user,
+// chap-secret, mutual-chap-user and mutual-chap-secret. Lines starting with #
 // or ; are comments. Double quotes around a value keep spaces at its ends.
 // Relative paths are relative to the file's folder.
 //
@@ -32,6 +34,11 @@
 #include <string_view>
 
 namespace tiscsi::config {
+
+// CHAP secrets: RFC 3720 asks for at least 96 bits; the Microsoft iSCSI
+// Initiator wants 12 to 16 characters.
+constexpr size_t kMinChapSecret = 12;
+constexpr size_t kMaxChapSecret = 255;
 
 struct ConfigError {
     enum class Code {
@@ -56,6 +63,10 @@ struct ConfigError {
         NoDisks,
         TargetWithoutDisks, // `value`: the target
         LdmUnused,
+        InvalidInitiatorName, // `value`
+        InvalidSecret,      // `option`: a CHAP secret shorter than kMinChapSecret or too long
+        ChapIncomplete,     // `value`: the target, with a CHAP user or mutual setting but no secret
+        ChapSameSecret,     // `value`: the target, whose mutual secret is its CHAP secret
     };
 
     Code code = Code::None;

@@ -2,14 +2,22 @@
 # Copyright (C) 2026 A1ive
 """Minimal iSCSI initiator for exercising TISCSI from tests.
 
-Implements just enough of RFC 3720 (initiator side) to log in, run SCSI
-commands with R2T / immediate / unsolicited data, send text, NOP and logout
-requests. No digests, one connection per session.
+Implements just enough of RFC 3720 (initiator side) to log in (also with
+CHAP), run SCSI commands with R2T / immediate / unsolicited data, send text,
+NOP and logout requests. No digests, one connection per session.
 """
+import hashlib
+import os
 import socket
 import struct
+from base64 import b64encode
 
 DEFAULT_INITIATOR = "iqn.2026-10.test:initiator"
+
+
+def chap_response(identifier, secret, challenge):
+    """MD5(identifier || secret || challenge) (RFC 1994)."""
+    return hashlib.md5(bytes([identifier]) + secret.encode() + challenge).digest()
 
 
 def kv(params):
@@ -132,6 +140,47 @@ class Session:
         _, status, tsih, resp = self.login(base + ops, 1, 3)
         self.params = {k: v[0] for k, v in resp.items()}
         return status, tsih, security_ok
+
+    def chap_login(self, target, name, secret, mutual_secret=None, offer="CHAP,None", algorithms="5",
+                   reflect=False, base64=False):
+        """Logs in to `target` with CHAP (mutual if `mutual_secret`), as the
+        Microsoft initiator does: AuthMethod, then CHAP_A, then CHAP_N / CHAP_R.
+
+        Returns (status, details): details has "mutual_ok" (the target's
+        answer to our challenge checked out), "target_name" (its CHAP_N) and
+        "keys" (the last response)."""
+        details = {"mutual_ok": None, "target_name": None, "keys": {}}
+        base = [("InitiatorName", self.initiator), ("SessionType", "Normal"), ("TargetName", target)]
+        _, status, _, resp = self.login(base + [("AuthMethod", offer)], 0, 1)
+        details["keys"] = resp
+        if status or resp.get("AuthMethod") != ["CHAP"]:
+            return status, details
+        _, status, _, resp = self.login([("CHAP_A", algorithms)], 0, 1)
+        details["keys"] = resp
+        if status:
+            return status, details
+        identifier = int(resp["CHAP_I"][0])
+        challenge = bytes.fromhex(resp["CHAP_C"][0][2:])
+        digest = chap_response(identifier, secret, challenge)
+        value = "0b" + b64encode(digest).decode() if base64 else "0x" + digest.hex()
+        keys = [("CHAP_N", name), ("CHAP_R", value)]
+        if mutual_secret is not None:
+            my_identifier, my_challenge = 77, challenge if reflect else os.urandom(16)
+            keys += [("CHAP_I", str(my_identifier)), ("CHAP_C", "0x" + my_challenge.hex())]
+        rbhs, status, _, resp = self.login(keys, 0, 1)
+        details["keys"] = resp
+        if status:
+            return status, details
+        if mutual_secret is not None:
+            expected = "0x" + chap_response(my_identifier, mutual_secret, my_challenge).hex()
+            details["mutual_ok"] = resp.get("CHAP_R") == [expected]
+            details["target_name"] = resp.get("CHAP_N", [None])[0]
+        if not rbhs[1] & 0x80:
+            return "no transit", details
+        ops = [("HeaderDigest", "None"), ("DataDigest", "None")]
+        _, status, _, resp = self.login(ops, 1, 3)
+        self.params = {k: v[0] for k, v in resp.items()}
+        return status, details
 
     # ---- full feature phase ---------------------------------------------
 

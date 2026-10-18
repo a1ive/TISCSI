@@ -237,4 +237,8 @@ BEGIN
     IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk はダイナミック ボリュームと一緒に使用してください。"
     IDS_ERR_NO_SUCH_DEVICE  "{0} という名前のデバイスがありません。接続されていない可能性があります。"
     IDS_ERR_AMBIGUOUS_DEVICE "{0} という名前のデバイスが複数あります。"
+    IDS_ERR_CONFIG_INITIATOR_NAME "iSCSI イニシエーター名が無効です: {0}"
+    IDS_ERR_CONFIG_SECRET   "{0} は {1}～{2} 文字にしてください。"
+    IDS_ERR_CONFIG_CHAP_INCOMPLETE "ターゲット {0}: chap-user と相互 CHAP の設定には chap-secret が、mutual-chap-user には mutual-chap-secret が必要です。"
+    IDS_ERR_CONFIG_CHAP_SAME_SECRET "ターゲット {0}: mutual-chap-secret は chap-secret と別の値にしてください。"
 END

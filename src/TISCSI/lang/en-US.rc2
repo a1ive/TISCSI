@@ -235,4 +235,8 @@ BEGIN
     IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk can only be used with dynamic volumes."
     IDS_ERR_NO_SUCH_DEVICE  "No device has the name {0}. It may not be connected."
     IDS_ERR_AMBIGUOUS_DEVICE "More than one device has the name {0}."
+    IDS_ERR_CONFIG_INITIATOR_NAME "Invalid iSCSI initiator name: {0}"
+    IDS_ERR_CONFIG_SECRET   "{0} must be {1} to {2} characters long."
+    IDS_ERR_CONFIG_CHAP_INCOMPLETE "Target {0}: chap-user and the mutual CHAP settings need chap-secret, and mutual-chap-user needs mutual-chap-secret."
+    IDS_ERR_CONFIG_CHAP_SAME_SECRET "Target {0}: mutual-chap-secret must differ from chap-secret."
 END

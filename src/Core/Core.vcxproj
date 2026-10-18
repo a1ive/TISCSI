@@ -76,6 +76,7 @@
     <ClInclude Include="iscsi\Parameters.h" />
     <ClInclude Include="iscsi\IscsiName.h" />
     <ClInclude Include="iscsi\IscsiTarget.h" />
+    <ClInclude Include="iscsi\Chap.h" />
     <ClInclude Include="iscsi\Session.h" />
     <ClInclude Include="iscsi\Connection.h" />
     <ClInclude Include="iscsi\IscsiServer.h" />
@@ -107,6 +108,7 @@
     <ClCompile Include="iscsi\Pdu.cpp" />
     <ClCompile Include="iscsi\IscsiName.cpp" />
     <ClCompile Include="iscsi\IscsiTarget.cpp" />
+    <ClCompile Include="iscsi\Chap.cpp" />
     <ClCompile Include="iscsi\Session.cpp" />
     <ClCompile Include="iscsi\Connection.cpp" />
     <ClCompile Include="iscsi\IscsiServer.cpp" />

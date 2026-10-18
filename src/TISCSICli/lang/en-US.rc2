@@ -61,7 +61,21 @@ Server:\n\
   --lang <tag>         Language: en-US, ja-JP, zh-CN, zh-TW\n\
                        or ko-KR (default: Windows language)\n\
   --help               Show this help\n\n"
-    IDS_CLI_USAGE_MORE "Configuration files:\n\
+    IDS_CLI_USAGE_MORE "Access control (for the current target):\n\
+  --allow-initiator <name>\n\
+                       Only this initiator may log in (repeat for more); the\n\
+                       others do not see the target in discovery\n\
+  --chap-secret <secret>\n\
+                       Require CHAP with this secret (12 to 255 characters)\n\
+  --chap-user <name>   The CHAP name the initiator must use (default: any)\n\
+  --mutual-chap-secret <secret>\n\
+                       Secret for answering the initiator's mutual CHAP\n\
+                       challenge (must differ from --chap-secret)\n\
+  --mutual-chap-user <name>\n\
+                       The target's CHAP name (default: the target name)\n\
+                       Secrets on the command line can be seen by other\n\
+                       programs; prefer a configuration file\n\n\
+Configuration files:\n\
   --config <file>      Read the server options, targets and disks from a file;\n\
                        server options given as well override the file's\n\
   --save-config <file> Write the targets and options to a file instead of\n\
@@ -119,6 +133,9 @@ Example:\n\
     IDS_CLI_SERVICE_REMOVED "Removed the service {0}."
     IDS_CLI_WARN_NO_WAIT "Warning: the configuration has no wait setting. When Windows starts, the disks may not be ready yet; consider wait = 60 in [server]."
     IDS_CLI_HINT_ADMIN_SERVICE "Installing and removing the service requires running as administrator."
+    IDS_CLI_ACCESS_INITIATORS "  Allowed initiators: {0}"
+    IDS_CLI_ACCESS_CHAP "  CHAP authentication required"
+    IDS_CLI_ACCESS_MUTUAL_CHAP "  CHAP authentication required; mutual CHAP available"
     IDS_CLI_LAYOUT_SIMPLE "simple"
     IDS_CLI_LAYOUT_SPANNED "spanned"
     IDS_CLI_LAYOUT_STRIPED "striped"
@@ -183,4 +200,8 @@ Example:\n\
     IDS_CLI_ERR_SERVICE_START "Cannot start the service {0}: {1}"
     IDS_CLI_ERR_SERVICE_STOPPED "The service {0} stopped (exit code {1}). See its log: {2}"
     IDS_CLI_ERR_NOT_SERVICE "--service is for the Windows service controller. Install the service with --install-service."
+    IDS_CLI_ERR_INVALID_INITIATOR_NAME "Invalid iSCSI initiator name: {0}"
+    IDS_CLI_ERR_INVALID_SECRET "{0} must be {1} to {2} characters long."
+    IDS_CLI_ERR_CHAP_INCOMPLETE "Target {0}: chap-user and the mutual CHAP settings need chap-secret, and mutual-chap-user needs mutual-chap-secret."
+    IDS_CLI_ERR_CHAP_SAME_SECRET "Target {0}: mutual-chap-secret must differ from chap-secret."
 END

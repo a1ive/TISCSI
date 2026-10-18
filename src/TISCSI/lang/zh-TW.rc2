@@ -237,4 +237,8 @@ BEGIN
     IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk 只能與動態磁碟區一起使用。"
     IDS_ERR_NO_SUCH_DEVICE  "沒有名為 {0} 的裝置，它可能未連接。"
     IDS_ERR_AMBIGUOUS_DEVICE "有多個裝置名為 {0}。"
+    IDS_ERR_CONFIG_INITIATOR_NAME "iSCSI 啟動器名稱無效: {0}"
+    IDS_ERR_CONFIG_SECRET   "{0} 的長度必須為 {1} 到 {2} 個字元。"
+    IDS_ERR_CONFIG_CHAP_INCOMPLETE "目標 {0}: chap-user 與相互 CHAP 設定需要 chap-secret，mutual-chap-user 需要 mutual-chap-secret。"
+    IDS_ERR_CONFIG_CHAP_SAME_SECRET "目標 {0}: mutual-chap-secret 必須與 chap-secret 不同。"
 END
