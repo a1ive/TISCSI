@@ -8,6 +8,7 @@
 #include "Console.h"
 #include "Core/disk/DeviceDisk.h"
 #include "Core/disk/DiskImage.h"
+#include "Core/disk/IsoImage.h"
 #include "Core/disk/RamDisk.h"
 #include "Core/disk/Vhd.h"
 #include "Core/scsi/SptiTarget.h"
@@ -286,7 +287,8 @@ int Run(const cli::Options& options)
             disk::OpenError error;
             switch (diskSpec.kind) {
             case cli::DiskSpec::Kind::Image:
-                disk = disk::OpenDiskImage(diskSpec.path, diskSpec.readOnly, error);
+                disk = diskSpec.optical ? disk::IsoImage::Open(diskSpec.path, error)
+                                        : disk::OpenDiskImage(diskSpec.path, diskSpec.readOnly, error);
                 description = diskSpec.path;
                 break;
             case cli::DiskSpec::Kind::PhysicalDisk:

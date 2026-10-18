@@ -132,7 +132,7 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
             return std::nullopt;
         };
         const bool knownWithValue = arg.name == L"--target" || arg.name == L"--image" || arg.name == L"--image-ro" ||
-                                    arg.name == L"--ram" || arg.name == L"--listen" || arg.name == L"--port" ||
+                                    arg.name == L"--cdrom" || arg.name == L"--ram" || arg.name == L"--listen" || arg.name == L"--port" ||
                                     arg.name == L"--log" || arg.name == L"--verbosity" || arg.name == L"--lang" ||
                                     arg.name == L"--create-vhd" || arg.name == L"--size" ||
                                     arg.name == L"--disk" || arg.name == L"--disk-ro" || arg.name == L"--volume" ||
@@ -158,11 +158,12 @@ std::optional<std::wstring> ParseOptions(int argc, wchar_t** argv, Options& opti
                 }
             }
             options.targets.push_back({name, {}, {}});
-        } else if (arg.name == L"--image" || arg.name == L"--image-ro") {
+        } else if (arg.name == L"--image" || arg.name == L"--image-ro" || arg.name == L"--cdrom") {
             DiskSpec disk;
             disk.kind = DiskSpec::Kind::Image;
             disk.path = *value;
-            disk.readOnly = arg.name == L"--image-ro";
+            disk.optical = arg.name == L"--cdrom";
+            disk.readOnly = arg.name != L"--image";
             if (auto error = AddDisk(options, std::move(disk))) {
                 return error;
             }

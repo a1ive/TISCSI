@@ -22,6 +22,7 @@ struct DiskSpec {
     // DynamicVolume: GUID, name, drive letter or mount point
     std::wstring path;
     bool readOnly = false;  // Image, PhysicalDisk, Volume, DynamicVolume
+    bool optical = false;   // Image: served as a CD/DVD-ROM whatever its extension (--cdrom)
     uint64_t size = 0;      // RamDisk, in bytes
     uint32_t diskIndex = 0; // PhysicalDisk
 };

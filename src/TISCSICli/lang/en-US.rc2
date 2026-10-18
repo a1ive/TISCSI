@@ -16,6 +16,7 @@ Disks (each one becomes the next LUN of the current target):\n\
   --image <path>       Disk image, read-write (.vhd, .vmdk; other extensions: raw)\n\
                        An .iso image is a read-only CD/DVD-ROM drive\n\
   --image-ro <path>    Disk image, read-only\n\
+  --cdrom <path>       Any file as the disc in a read-only CD/DVD-ROM drive\n\
   --ram <size>         New RAM disk, e.g. 512M or 2G\n\
   --disk <n>           Physical disk n, read-write (its volumes are locked)\n\
   --disk-ro <n>        Physical disk n, read-only\n\

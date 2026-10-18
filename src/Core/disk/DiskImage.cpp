@@ -9,7 +9,6 @@
 #include "Core/disk/Vmdk.h"
 
 namespace tiscsi::disk {
-namespace {
 
 bool HasExtension(const std::wstring& path, const wchar_t* extension)
 {
@@ -20,8 +19,6 @@ bool HasExtension(const std::wstring& path, const wchar_t* extension)
     }
     return CompareStringW(LOCALE_INVARIANT, NORM_IGNORECASE, path.c_str() + dot, -1, extension, -1) == CSTR_EQUAL;
 }
-
-} // namespace
 
 std::unique_ptr<Disk> OpenDiskImage(const std::wstring& path, bool readOnly, OpenError& error)
 {

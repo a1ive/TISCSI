@@ -705,6 +705,32 @@ def test_optical_images(ctx):
                        make_sparse(ctx.path("tiny.iso"), 2000))
     ctx.check(rc == 2 and "Cannot open" in out, "an .iso smaller than one sector is refused")
 
+    # --cdrom serves any file as a disc: no VHD parsing for a .vhd name.
+    bin_path, bin_content = make_iso(ctx, "disc.bin", 200)
+    vhd_path, vhd_content = make_iso(ctx, "not-a-disk.vhd", 300)
+    server = Server(ctx, ["--target", TARGET, "--cdrom", bin_path, "--cdrom=" + vhd_path, "--image-ro", bin_path])
+    with server:
+        s = ctx.session()
+        status, _, _ = s.full_login(TARGET)
+        ok = status == 0
+        for lun, sectors, content in ((0, 200, bin_content), (1, 300, vhd_content)):
+            st, data, _, _ = s.scsi(bytes([0x12, 0, 0, 0, 96, 0]), lun=lun, read_len=96)
+            ok = ok and st == 0 and data[0] & 0x1F == 5
+            st, data, _, _ = s.scsi(bytes([0x25] + [0] * 9), lun=lun, read_len=8)
+            ok = ok and st == 0 and struct.unpack(">II", data) == (sectors - 1, 2048)
+            st, data, _, _ = s.scsi(cdb10(0x28, sectors - 10, 10), lun=lun, read_len=10 * 2048)
+            ok = ok and st == 0 and data == content[-10 * 2048:]
+        ctx.check(ok, "--cdrom serves a .bin and a .vhd file as CD/DVD-ROM drives")
+        st, data, _, _ = s.scsi(bytes([0x12, 0, 0, 0, 96, 0]), lun=2, read_len=96)
+        st2, data2, _, _ = s.scsi(bytes([0x25] + [0] * 9), lun=2, read_len=8)
+        ctx.check(st == 0 and data[0] & 0x1F == 0 and st2 == 0 and data2[4:8] == b"\0\0\x02\0",
+                  "the same file with --image-ro is a disk")
+        s.logout()
+    ctx.check(re.search(r"LUN 1: .*not-a-disk\.vhd, .*\(read-only\)", server.output) is not None,
+              "the --cdrom LUN is listed as read-only")
+    rc, out = run_tool(ctx.exe, "--lang", "en-US", "--cdrom")
+    ctx.check(rc == 1 and "--cdrom" in out, "--cdrom needs a path")
+
 
 def powershell(script, timeout=180):
     command = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; $ErrorActionPreference = 'Stop'; " + script
@@ -1178,7 +1204,8 @@ class Gui:
     # Control and command IDs from src/TISCSI/resource.h
     IDOK, IDC_PORT, IDC_START, IDC_ADD_TARGET = 1, 1011, 1012, 1014
     IDC_TARGET_NAME, IDC_CREATE_RAMDISK, IDC_SIZE_MB, IDM_LANG_FIRST = 1020, 1023, 1033, 40101
-    IDC_ADD_IMAGE, IDC_PATH = 1024, 1030
+    IDC_ADD_IMAGE, IDC_PATH, IDC_READ_ONLY, IDC_OPTICAL = 1024, 1030, 1032, 1038
+    BM_GETCHECK, BM_CLICK = 0x00F0, 0x00F5
 
     def __init__(self, exe, args):
         import ctypes
@@ -1225,6 +1252,14 @@ class Gui:
         self.user32.SendMessageW(self.user32.GetDlgItem(dialog, control), self.WM_SETTEXT, 0,
                                  self.ctypes.addressof(buffer))
 
+    def click(self, dialog, control):
+        self.user32.SendMessageW(self.user32.GetDlgItem(dialog, control), self.BM_CLICK, 0, 0)
+
+    def checkbox(self, dialog, control):
+        """(checked, enabled) of a check box."""
+        hwnd = self.user32.GetDlgItem(dialog, control)
+        return self.user32.SendMessageW(hwnd, self.BM_GETCHECK, 0, 0) == 1, bool(self.user32.IsWindowEnabled(hwnd))
+
     def command(self, window, command_id):
         self.user32.PostMessageW(window, self.WM_COMMAND, command_id, 0)
 
@@ -1264,6 +1299,16 @@ def test_gui(ctx):
         gui.set_text(image, Gui.IDC_PATH, iso)
         gui.command(image, Gui.IDOK)
         time.sleep(0.5)
+        disc, disc_content = make_iso(ctx, "gui-disc.bin", 64)
+        gui.command(add, Gui.IDC_ADD_IMAGE)
+        image = gui.top_window()
+        gui.set_text(image, Gui.IDC_PATH, disc)
+        gui.click(image, Gui.IDC_OPTICAL)
+        ctx.check(gui.checkbox(image, Gui.IDC_OPTICAL) == (True, True) and
+                  gui.checkbox(image, Gui.IDC_READ_ONLY) == (True, False),
+                  "the CD/DVD-ROM check box sets and locks Read-only")
+        gui.command(image, Gui.IDOK)
+        time.sleep(0.5)
         gui.command(add, Gui.IDOK)
         time.sleep(0.5)
         gui.command(main, Gui.IDC_START)
@@ -1282,6 +1327,10 @@ def test_gui(ctx):
         st2, sector, _, _ = s.scsi(cdb10(0x28, 16, 1), lun=1, read_len=2048)
         ctx.check(st == 0 and inquiry[0] & 0x1F == 5 and st2 == 0 and sector == iso_content[16 * 2048:17 * 2048],
                   "an .iso added in the GUI is a CD/DVD-ROM drive")
+        st, inquiry, _, _ = s.scsi(bytes([0x12, 0, 0, 0, 96, 0]), lun=2, read_len=96)
+        st2, sector, _, _ = s.scsi(cdb10(0x28, 63, 1), lun=2, read_len=2048)
+        ctx.check(st == 0 and inquiry[0] & 0x1F == 5 and st2 == 0 and sector == disc_content[63 * 2048:],
+                  "a .bin added with the CD/DVD-ROM check box is a CD/DVD-ROM drive")
         s.logout()
         time.sleep(0.8)
         ctx.check("0 active session(s)" in gui.status_text(main), "status bar: session ended")

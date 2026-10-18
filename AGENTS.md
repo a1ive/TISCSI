@@ -150,7 +150,8 @@ These are deliberate. Don't "fix" them back to the original behavior.
   (`--ldm-disk`), with no administrator rights needed.
 - SPTI passes the initiator's expected read length through the SCSI target
   interface instead of parsing CDBs; REPORT LUNS is answered locally.
-- `.iso` images are served as read-only CD/DVD-ROM drives (iSCSI Console has
+- `.iso` images, and any file given with `--cdrom` (GUI: the CD/DVD-ROM
+  check box), are served as read-only CD/DVD-ROM drives (iSCSI Console has
   no optical support; its PRs #9 / #10 were never merged and were not
   ported). Every LUN also takes MODE SENSE (10) and READ / WRITE (12).
 
@@ -168,7 +169,11 @@ These are deliberate. Don't "fix" them back to the original behavior.
   device type 5 and answer MMC commands (`scsi/MmcData`) for a finalized
   single-session disc with one data track. Up to 80 minutes (360000 sectors)
   is a CD, larger is a DVD. The disc is always present: eject requests are
-  accepted and ignored, and no media events are reported.
+  accepted and ignored, and no media events are reported. `IsoImage` reads
+  any file as raw 2048-byte sectors; `OpenDiskImage` picks it for `.iso`,
+  `--cdrom` and the GUI check box use it whatever the extension. Verified
+  with the Microsoft iSCSI Initiator (XP and current Windows), Linux
+  open-iscsi, iPXE `sanboot` and UEFI boot.
 - Physical disks: read-write locks and dismounts every volume on the disk
   and asks Windows to re-read the partition table on release. Read-only takes
   no locks.
@@ -237,13 +242,6 @@ These are deliberate. Don't "fix" them back to the original behavior.
   disks; so far only `ldm_tool.py` images are covered.
 - GUI flows that need administrator rights are not automated: adding
   physical disks, volumes and unmounted dynamic volumes.
-- Run `test_optical_elevated`: the Microsoft iSCSI Initiator has not been
-  tried against `.iso` LUNs yet. Linux (open-iscsi, `sr` driver, udev
-  `cdrom_id`) mounts and reads them. Also try iPXE `sanboot` and UEFI boot
-  from an `.iso` LUN, and the XP initiator.
-- An explicit option to serve any file as a CD/DVD-ROM regardless of its
-  extension (e.g. `--cdrom <path>` and a GUI checkbox); today only `.iso`
-  is recognized.
 - Manual checks on XP / Windows 7, including the CJK font fallback (SimSun,
   PMingLiU, Gulim on XP).
 - Not supported: compressed (streamOptimized) VMDK, VMFSSPARSE / SESPARSE,

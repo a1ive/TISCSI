@@ -44,6 +44,9 @@ struct OpenError {
     }
 };
 
+// Whether `path` ends with `extension` (".vhd"), ignoring case.
+bool HasExtension(const std::wstring& path, const wchar_t* extension);
+
 // Read-write images are opened exclusively; parents of differencing images
 // and .iso images are always opened read-only (shared).
 std::unique_ptr<Disk> OpenDiskImage(const std::wstring& path, bool readOnly, OpenError& error);

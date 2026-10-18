@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 A1ive
 //
-// Optical disc image (.iso): a flat file of 2048-byte sectors, served as the
-// disc in a read-only CD/DVD-ROM drive.
+// Optical disc image: a flat file of 2048-byte sectors (an .iso, or any file
+// the user chose to serve as a disc), served as the disc in a read-only
+// CD/DVD-ROM drive.
 
 #pragma once
 

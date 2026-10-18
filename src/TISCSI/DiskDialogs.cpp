@@ -7,6 +7,7 @@
 #include "Common/Text.h"
 #include "Core/disk/DeviceDisk.h"
 #include "Core/disk/DiskImage.h"
+#include "Core/disk/IsoImage.h"
 #include "Core/disk/RamDisk.h"
 #include "Core/disk/Vhd.h"
 #include "Core/ldm/DynamicVolumes.h"
@@ -110,8 +111,24 @@ private:
         if (id == IDC_BROWSE) {
             if (auto path = ui::BrowseForFile(m_dialog, IDS_FILTER_IMAGES, false, nullptr)) {
                 SetDlgItemTextW(m_dialog, IDC_PATH, path->c_str());
+                if (disk::HasExtension(*path, L".iso")) {
+                    CheckDlgButton(m_dialog, IDC_OPTICAL, BST_CHECKED);
+                    UpdateReadOnly();
+                }
             }
+        } else if (id == IDC_OPTICAL) {
+            UpdateReadOnly();
         }
+    }
+
+    // A disc is always read-only.
+    void UpdateReadOnly()
+    {
+        const bool optical = IsDlgButtonChecked(m_dialog, IDC_OPTICAL) == BST_CHECKED;
+        if (optical) {
+            CheckDlgButton(m_dialog, IDC_READ_ONLY, BST_CHECKED);
+        }
+        EnableWindow(GetDlgItem(m_dialog, IDC_READ_ONLY), !optical);
     }
 
     bool OnOk() override
@@ -122,8 +139,9 @@ private:
             return false;
         }
         const bool readOnly = IsDlgButtonChecked(m_dialog, IDC_READ_ONLY) == BST_CHECKED;
+        const bool optical = IsDlgButtonChecked(m_dialog, IDC_OPTICAL) == BST_CHECKED;
         disk::OpenError error;
-        m_choice.disk = disk::OpenDiskImage(path, readOnly, error);
+        m_choice.disk = optical ? disk::IsoImage::Open(path, error) : disk::OpenDiskImage(path, readOnly, error);
         if (!m_choice.disk) {
             ui::ShowError(m_dialog, ui::ExplainOpenError(error, false));
             return false;

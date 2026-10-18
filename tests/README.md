@@ -20,8 +20,8 @@ helper, because the Microsoft tools for that need administrator rights.
 Dynamic volume tests use images of LDM disks built by `ldm_tool.py` (every
 layout, degraded volumes, damaged header copies).
 
-Optical disc tests serve `.iso` images and check the CD/DVD-ROM (MMC)
-commands. `iso_tool.py` writes small ISO 9660 images from the specification,
+Optical disc tests serve `.iso` images and files given with `--cdrom`, and
+check the CD/DVD-ROM (MMC) commands. `iso_tool.py` writes small ISO 9660 images from the specification,
 so no mkisofs is needed.
 
 Run from an elevated command prompt to include the device tests: they create

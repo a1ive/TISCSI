@@ -50,6 +50,7 @@
 #define IDC_DYNAMIC 1035
 #define IDC_PROGRESS 1036
 #define IDC_DEVICE_LIST 1037
+#define IDC_OPTICAL 1038
 
 // Menu commands
 #define IDM_FILE_EXIT 40001
