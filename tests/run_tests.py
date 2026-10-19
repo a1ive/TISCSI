@@ -141,6 +141,35 @@ def test_protocol(ctx):
         _protocol_checks(ctx, ram_size, os.path.getsize(image))
 
 
+def test_synchronize_cache(ctx):
+    size = 1024 * 1024
+    raw = ctx.make_image("sync-cache.img", size)
+    readonly = ctx.make_image("sync-cache-ro.img", size)
+    optical = ctx.make_image("sync-cache.iso", size)
+    pattern = os.urandom(4096)
+    with Server(ctx, ["--target", TARGET, "--ram", "1M", "--image", raw,
+                      "--image-ro", readonly, "--image", optical]):
+        s = ctx.session()
+        ctx.check(s.full_login(TARGET)[0] == 0, "SYNCHRONIZE CACHE login")
+        ctx.check(s.write(7, pattern, lun=1)[0] == 0, "write data before SYNCHRONIZE CACHE")
+        for opcode, encode, name in ((0x35, cdb10, "SYNCHRONIZE CACHE(10)"),
+                                     (0x91, cdb16, "SYNCHRONIZE CACHE(16)")):
+            for lun in range(4):
+                for lba, blocks in ((0, 0), (7, 8), (7, 0)):
+                    st, data, r2ts, _ = s.scsi(encode(opcode, lba, blocks), lun=lun)
+                    ctx.check(st == 0 and not data and r2ts == 0,
+                              f"{name} LUN {lun}, LBA {lba}, blocks {blocks}: GOOD without data transfer")
+            st, data, _, _ = s.scsi(encode(opcode, 0, 0), lun=4)
+            ctx.check(st == 2 and sense_key(data) == 5 and asc(data) == 0x25,
+                      name + " rejects missing LUN")
+        st, data, _, _ = s.read(7, 8, lun=1)
+        ctx.check(st == 0 and data == pattern, "SYNCHRONIZE CACHE preserves written data")
+        s.logout()
+    with open(raw, "rb") as f:
+        ctx.check(f.read() == bytes(7 * 512) + pattern + bytes(size - 15 * 512),
+                  "image contains the expected data after SYNCHRONIZE CACHE")
+
+
 def test_verify(ctx):
     def cdb(op, lba, blocks, flags=0):
         if op == 0x2F:
@@ -2071,7 +2100,8 @@ def test_gui(ctx):
                 f.write(saved_ini)
 
 
-TESTS = [test_cli_errors, test_protocol, test_verify, test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
+TESTS = [test_cli_errors, test_protocol, test_verify, test_synchronize_cache,
+         test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
          test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_optical_images,
          test_config_files, test_access, test_service, test_service_elevated, test_optical_elevated, test_devices_unprivileged,
          test_devices_elevated, test_dynamic_volumes, test_dynamic_volumes_elevated, test_gui]

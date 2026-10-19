@@ -101,6 +101,7 @@ ScsiStatus VirtualScsiTarget::ExecuteCommand(const CdbBytes& cdbBytes, const Lun
     case op::Write16:
         return Write(cdb, lun, data, response);
     case op::SynchronizeCache10:
+    case op::SynchronizeCache16:
         return SynchronizeCache(lun, response);
     case op::ServiceActionIn16:
         if (cdb.serviceAction == ServiceAction::ReadCapacity16) {
@@ -399,6 +400,8 @@ ScsiStatus VirtualScsiTarget::Verify(const Cdb& cdb, uint16_t lun, std::span<con
 
 ScsiStatus VirtualScsiTarget::SynchronizeCache(uint16_t lun, Bytes& response)
 {
+    // Disk exposes whole-disk flushing. Both CDB sizes synchronously flush the
+    // entire LUN, including requests that specify a smaller range.
     if (m_disks[lun]->Flush() != disk::IoResult::Ok) {
         m_log.Write(Severity::Error, "Synchronize cache error: I/O failure");
         return CheckCondition(response, SenseData::WriteFault());

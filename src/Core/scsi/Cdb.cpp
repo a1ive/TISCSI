@@ -125,6 +125,7 @@ std::optional<Cdb> Cdb::Parse(const std::array<uint8_t, 16>& bytes)
     case op::Read16:
     case op::Write16:
     case op::Verify16:
+    case op::SynchronizeCache16:
     case op::WriteSame16:
     case op::ServiceActionIn16:
         Parse16(b, cdb);

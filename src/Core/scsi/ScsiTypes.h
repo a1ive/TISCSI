@@ -45,6 +45,7 @@ constexpr uint8_t ModeSense10 = 0x5A;
 constexpr uint8_t Read16 = 0x88;
 constexpr uint8_t Write16 = 0x8A;
 constexpr uint8_t Verify16 = 0x8F;
+constexpr uint8_t SynchronizeCache16 = 0x91;
 constexpr uint8_t WriteSame16 = 0x93;
 constexpr uint8_t ServiceActionIn16 = 0x9E;
 constexpr uint8_t ReportLuns = 0xA0;

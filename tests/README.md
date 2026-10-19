@@ -9,12 +9,19 @@ python tests\run_tests.py
 python tests\run_tests.py --exe bin\Win32\Release\TISCSICli.exe
 python tests\run_tests.py -k protocol
 python tests\run_tests.py -k verify
+python tests\run_tests.py -k synchronize_cache
 ```
 
 VERIFY tests cover READ-style medium verification and byte comparisons for
 VERIFY (10), (12) and (16), using RAM, writable/read-only raw images and ISO
 images. They check multi-burst Data-Out, zero length, range overflow,
 unsupported flags, mismatches across read chunks and unchanged disk contents.
+
+SYNCHRONIZE CACHE (10)/(16) tests cover RAM, writable/read-only raw images,
+ISO images, range requests and invalid LUNs. Both commands synchronously
+flush the whole LUN through `Disk::Flush`, including requests for a smaller
+range. The native test checks that the backend is called and that flush
+errors reach the initiator as MEDIUM ERROR / WRITE FAULT (03/03/00).
 
 The separate `verify_target.cpp` test injects flush errors, read errors and
 short reads through `Disk`. It also checks bounded reads, 4096-byte sectors

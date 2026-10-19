@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 A1ive
-// Fault-injection tests for VERIFY; see tests/README.md for the build command.
+// Fault-injection tests for VERIFY and SYNCHRONIZE CACHE; see tests/README.md.
 
 #include "Core/scsi/VirtualScsiTarget.h"
 #include "Core/util/ByteOrder.h"
@@ -54,7 +54,7 @@ public:
     }
     disk::IoResult WriteSectors(uint64_t, std::span<const uint8_t>) override
     {
-        Check(false, "VERIFY must never write sectors");
+        Check(false, "VERIFY and SYNCHRONIZE CACHE must never write sectors");
         return disk::IoResult::WriteError;
     }
     void Reset(uint64_t lba)
@@ -73,12 +73,12 @@ scsi::CdbBytes Command(uint8_t op, uint64_t lba, uint32_t count, uint8_t flags =
     scsi::CdbBytes cdb{};
     cdb[0] = op;
     cdb[1] = flags;
-    if (op == scsi::op::Verify16) {
+    if (op == scsi::op::Verify16 || op == scsi::op::SynchronizeCache16) {
         util::WriteBE64(cdb.data() + 2, lba);
         util::WriteBE32(cdb.data() + 10, count);
     } else {
         util::WriteBE32(cdb.data() + 2, static_cast<uint32_t>(lba));
-        if (op == scsi::op::Verify10) {
+        if (op == scsi::op::Verify10 || op == scsi::op::SynchronizeCache10) {
             util::WriteBE16(cdb.data() + 7, static_cast<uint16_t>(count));
         } else {
             util::WriteBE32(cdb.data() + 6, count);
@@ -97,6 +97,32 @@ int main()
     disks.push_back(std::move(disk));
     scsi::VirtualScsiTarget target(std::move(disks), {});
     scsi::Bytes response;
+    for (const uint8_t op : {scsi::op::SynchronizeCache10, scsi::op::SynchronizeCache16}) {
+        const bool wide = op == scsi::op::SynchronizeCache16;
+        const uint64_t lba = wide ? (uint64_t{1} << 32) + 7 : 7;
+        const uint32_t count = wide ? 65537 : 8;
+        auto cdb = Command(op, lba, count);
+        cdb[wide ? 15 : 9] = 0x80; // vendor-specific control bit, to check the parsed offset
+        const auto parsed = scsi::Cdb::Parse(cdb);
+        Check(parsed && parsed->logicalBlockAddress == lba && parsed->transferLength == count &&
+              parsed->control == 0x80, "SYNCHRONIZE CACHE preserves CDB field widths and offsets");
+        for (const auto result : {disk::IoResult::Ok, disk::IoResult::WriteError}) {
+            probe.Reset(lba);
+            probe.flushResult = result;
+            response.assign(42, 0xCC);
+            const auto status = target.ExecuteCommand(cdb, {}, {}, 0, response);
+            Check(probe.flushes == 1 && probe.reads == 0, "SYNCHRONIZE CACHE calls Flush exactly once");
+            if (result == disk::IoResult::Ok) {
+                Check(status == scsi::ScsiStatus::Good && response.empty(), "flush success returns GOOD without data");
+            } else {
+                Check(status == scsi::ScsiStatus::CheckCondition && response.size() == 20 &&
+                      util::ReadBE16(response.data()) == 18 && (response[4] & 0x0F) == 3 &&
+                      response[14] == 3 && response[15] == 0,
+                      "flush failure returns framed MEDIUM ERROR / WRITE FAULT");
+            }
+        }
+    }
+    std::puts("PASS SYNCHRONIZE CACHE(10/16): CDB fields, backend Flush, success and failure responses");
     for (const uint8_t op : {scsi::op::Verify10, scsi::op::Verify12, scsi::op::Verify16}) {
         const uint64_t lba = op == scsi::op::Verify16 ? (uint64_t{1} << 32) + 7 : 7;
         auto run = [&](uint32_t count, uint8_t flags = 0, std::span<const uint8_t> data = {}) {

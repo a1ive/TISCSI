@@ -139,7 +139,7 @@ These are deliberate. Don't "fix" them back to the original behavior.
   `ExpectedDataTransferLength`.
 - READ/WRITE (6) with length 0 means 256 blocks. Writes to read-only LUNs
   return framed sense data. Failed reads report the full residual.
-  SYNCHRONIZE CACHE flushes.
+  SYNCHRONIZE CACHE (10) and (16) synchronously flush the whole LUN.
 - VERIFY (10), (12) and (16) check the range, flush pending writes and read
   in bounded chunks. BYTCHK=1 compares the supplied blocks; BYTCHK=3 compares
   one supplied block against the whole range. Mismatches return MISCOMPARE
