@@ -18,9 +18,25 @@ using util::WriteBE64;
 
 Bytes SenseData::GetBytes() const
 {
+    if (information && *information > UINT32_MAX) {
+        Bytes b(20, 0);
+        b[0] = 0x72; // current errors, descriptor format
+        b[1] = senseKey & 0x0F;
+        b[2] = additionalSenseCode;
+        b[3] = additionalSenseCodeQualifier;
+        b[7] = 12;
+        b[8] = 0x00; // information descriptor
+        b[9] = 10;
+        b[10] = 0x80; // valid
+        WriteBE64(b.data() + 12, *information);
+        return b;
+    }
     Bytes b(18, 0);
     b[0] = 0x80 | 0x70; // valid, current errors
     b[2] = senseKey & 0x0F;
+    if (information) {
+        WriteBE32(b.data() + 3, static_cast<uint32_t>(*information));
+    }
     b[7] = 10; // additional sense length
     b[12] = additionalSenseCode;
     b[13] = additionalSenseCodeQualifier;

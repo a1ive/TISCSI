@@ -8,7 +8,34 @@ no extra packages.
 python tests\run_tests.py
 python tests\run_tests.py --exe bin\Win32\Release\TISCSICli.exe
 python tests\run_tests.py -k protocol
+python tests\run_tests.py -k verify
 ```
+
+VERIFY tests cover READ-style medium verification and byte comparisons for
+VERIFY (10), (12) and (16), using RAM, writable/read-only raw images and ISO
+images. They check multi-burst Data-Out, zero length, range overflow,
+unsupported flags, mismatches across read chunks and unchanged disk contents.
+
+The separate `verify_target.cpp` test injects flush errors, read errors and
+short reads through `Disk`. It also checks bounded reads, 4096-byte sectors
+and mismatch sense data for LBAs above 32 bits. From an **x64 Native Tools
+Command Prompt**, in the repository root:
+
+```bat
+msbuild TISCSI.sln -p:Configuration=Debug -p:Platform=x64
+cl /nologo /std:c++20 /EHsc /W4 /WX /utf-8 /MTd /D_DEBUG /I src tests\verify_target.cpp bin\x64\Debug\Core.lib /Fo:bin\x64\Debug\verify_target.obj /Fe:bin\x64\Debug\verify_target.exe /link /DEBUG
+bin\x64\Debug\verify_target.exe
+```
+
+VERIFY follows the unprotected-block behavior described in the
+[SCSI Commands Reference Manual, sections 3.55-3.57](https://www.seagate.com/files/staticfiles/support/docs/manual/Interface%20manuals/100293068j.pdf).
+BYTCHK=0 flushes and reads the range; BYTCHK=1 compares every block with
+Data-Out; BYTCHK=3 compares each block with one supplied block. Comparison
+data is limited to 32 MiB per command. The read buffer is at most 1 MiB for
+the supported sector sizes. Mismatches return MISCOMPARE (0E/1D/00) with
+the first differing LBA. Nonzero VRPROTECT, BYTCHK=2 and relative addressing
+are rejected. On optical LUNs, bit 2 is MMC's BLKVFY and is rejected rather
+than interpreted as SBC's repeated-block comparison.
 
 Image format tests use third-party tools when installed and are skipped
 otherwise: `qemu-img` (QEMU) and `vmware-vdiskmanager` (VMware Workstation).

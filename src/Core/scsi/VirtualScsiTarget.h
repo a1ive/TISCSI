@@ -41,6 +41,7 @@ private:
     bool MmcModePages(const Cdb& cdb, Bytes& pages);
     ScsiStatus Read(const Cdb& cdb, uint16_t lun, Bytes& response);
     ScsiStatus Write(const Cdb& cdb, uint16_t lun, std::span<const uint8_t> data, Bytes& response);
+    ScsiStatus Verify(const Cdb& cdb, uint16_t lun, std::span<const uint8_t> data, Bytes& response);
     ScsiStatus SynchronizeCache(uint16_t lun, Bytes& response);
     // Commands of CD/DVD-ROM drives (MMC).
     ScsiStatus ExecuteMmcCommand(const Cdb& cdb, const CdbBytes& cdbBytes, uint16_t lun, Bytes& response);

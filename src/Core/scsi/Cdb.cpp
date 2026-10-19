@@ -119,6 +119,7 @@ std::optional<Cdb> Cdb::Parse(const std::array<uint8_t, 16>& bytes)
     case op::ReportLuns:
     case op::Read12:
     case op::Write12:
+    case op::Verify12:
         Parse12(b, cdb);
         break;
     case op::Read16:
@@ -130,6 +131,9 @@ std::optional<Cdb> Cdb::Parse(const std::array<uint8_t, 16>& bytes)
         break;
     default:
         return std::nullopt;
+    }
+    if (cdb.opcode == op::Verify10 || cdb.opcode == op::Verify12 || cdb.opcode == op::Verify16) {
+        cdb.verifyFlags = b[1];
     }
     return cdb;
 }

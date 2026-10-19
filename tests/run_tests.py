@@ -141,6 +141,99 @@ def test_protocol(ctx):
         _protocol_checks(ctx, ram_size, os.path.getsize(image))
 
 
+def test_verify(ctx):
+    def cdb(op, lba, blocks, flags=0):
+        if op == 0x2F:
+            return struct.pack(">BBIBHB", op, flags, lba, 0, blocks, 0)
+        if op == 0xAF:
+            return struct.pack(">BBIIBB", op, flags, lba, blocks, 0, 0)
+        return struct.pack(">BBQIBB", op, flags, lba, blocks, 0, 0)
+
+    def check_sense(result, key, code, what, lba=None):
+        st, data, _, _ = result
+        good = st == 2 and sense_key(data) == key and asc(data) == code
+        good = good and len(data) == 20 and data[15] == 0 and int.from_bytes(data[:2], "big") == 18
+        if lba is not None:
+            good = good and data[2] & 0x80 and int.from_bytes(data[5:9], "big") == lba
+        ctx.check(good, what)
+
+    size = 8 * 1024 * 1024
+    lba, blocks = 7, 2051  # cross the bounded-read boundary, including a partial last chunk
+    pattern = os.urandom(blocks * 512)
+    optical_pattern = os.urandom(blocks * 2048)
+    raw = ctx.make_image("verify.img", size, bytes(lba * 512) + pattern)
+    readonly = ctx.make_image("verify-ro.img", size, bytes(lba * 512) + pattern)
+    optical = ctx.make_image("verify.iso", size, bytes(lba * 2048) + optical_pattern)
+    with Server(ctx, ["--target", TARGET, "--ram", "64M", "--image", raw,
+                      "--image-ro", readonly, "--image", optical]):
+        s = ctx.session()
+        ctx.check(s.full_login(TARGET, [("InitialR2T", "Yes"), ("ImmediateData", "No"),
+                                       ("MaxBurstLength", "65536")])[0] == 0, "VERIFY login")
+        ctx.check(s.write(lba, pattern)[0] == 0, "prepare VERIFY data on RAM disk")
+        for lun, block_size, content, disk_size in ((0, 512, pattern, 64 * 1024 * 1024),
+                                                   (1, 512, pattern, size), (2, 512, pattern, size),
+                                                   (3, 2048, optical_pattern, size)):
+            total = disk_size // block_size
+            for op, name in ((0x2F, "VERIFY(10)"), (0xAF, "VERIFY(12)"), (0x8F, "VERIFY(16)")):
+                label = f"{name} LUN {lun}"
+                st, data, _, _ = s.scsi(cdb(op, lba, blocks), lun=lun)
+                ctx.check(st == 0 and not data, label + " reads the range without Data-In")
+                st, data, r2ts, _ = s.scsi(cdb(op, lba, blocks, 2), lun=lun, write_data=content)
+                ctx.check(st == 0 and not data and r2ts > 1, label + " compares all blocks through multiple R2Ts")
+                for offset in (0, len(content) - 1):
+                    bad = bytearray(content)
+                    bad[offset] ^= 0xFF
+                    check_sense(s.scsi(cdb(op, lba, blocks, 2), lun=lun, write_data=bad), 0x0E, 0x1D,
+                                label + f" detects mismatch at byte {offset}", lba + offset // block_size)
+                ctx.check(s.scsi(cdb(op, total - 1, 1, 0x10), lun=lun)[0] == 0,
+                          label + " accepts last block and DPO")
+                for start, count in ((total, 1), (total - 1, 2), (0xFFFFFFFF, 2)):
+                    check_sense(s.scsi(cdb(op, start, count), lun=lun), 5, 0x21,
+                                label + f" rejects out-of-range {start}+{count}")
+                for mode in (0, 1, 3):
+                    if lun == 3 and mode == 3:
+                        continue  # MMC bit 2 means BLKVFY, not SBC repeat comparison
+                    ctx.check(s.scsi(cdb(op, total, 0, mode << 1), lun=lun)[0] == 0,
+                              label + f" zero length, BYTCHK={mode}, is a no-op")
+                for flags in (4, 0x20, 0x40, 0xE0, 8, 1):
+                    check_sense(s.scsi(cdb(op, lba, 1, flags), lun=lun), 5, 0x24,
+                                label + f" rejects unsupported flags 0x{flags:02x}")
+                for supplied in (None, content[:block_size - 1], content[:block_size + 1]):
+                    check_sense(s.scsi(cdb(op, lba, 1, 2), lun=lun, write_data=supplied), 5, 0x24,
+                                label + " rejects missing/short/excess comparison data")
+                check_sense(s.scsi(cdb(op, lba, 1), lun=lun, write_data=content[:block_size]), 5, 0x24,
+                            label + " rejects Data-Out with BYTCHK=0")
+                if lun != 3:
+                    zero = bytes(block_size)
+                    ctx.check(s.scsi(cdb(op, total - blocks, blocks, 6), lun=lun, write_data=zero)[0] == 0,
+                              label + " compares one repeated block across chunks")
+                    check_sense(s.scsi(cdb(op, lba - 1, 2, 6), lun=lun, write_data=zero), 0x0E, 0x1D,
+                                label + " repeated block detects second-block mismatch", lba)
+                    check_sense(s.scsi(cdb(op, lba, 2, 6), lun=lun, write_data=bytes(block_size * 2)), 5, 0x24,
+                                label + " repeated comparison requires exactly one block")
+                else:
+                    check_sense(s.scsi(cdb(op, lba, 1, 6), lun=lun), 5, 0x24,
+                                label + " rejects MMC blank verification")
+            st, data, _, _ = s.read(lba, blocks, lun=lun, block_size=block_size)
+            ctx.check(st == 0 and data == content, f"VERIFY did not modify LUN {lun}")
+        for op in (0xAF, 0x8F):
+            ctx.check(s.scsi(cdb(op, 0, 65537))[0] == 0, "32-bit verification length exceeds 65535 blocks")
+            check_sense(s.scsi(cdb(op, 0, 0xFFFFFFFF)), 5, 0x21, "large count is checked without allocation")
+        check_sense(s.scsi(cdb(0x8F, 1 << 32, 1)), 5, 0x21, "VERIFY(16) preserves high LBA bits")
+        check_sense(s.scsi(cdb(0x8F, (1 << 64) - 1, 2)), 5, 0x21, "VERIFY(16) range cannot wrap")
+        s.logout()
+        s = ctx.session(isid=0x23D000000002)
+        ctx.check(s.full_login(TARGET, [("InitialR2T", "No"), ("ImmediateData", "Yes")])[0] == 0,
+                  "VERIFY immediate/unsolicited login")
+        for op in (0x2F, 0xAF, 0x8F):
+            ctx.check(s.scsi(cdb(op, lba, blocks, 2), write_data=pattern)[0] == 0,
+                      "VERIFY compares immediate, unsolicited and R2T data")
+        s.logout()
+    with open(raw, "rb") as f:
+        ctx.check(f.read() == bytes(lba * 512) + pattern + bytes(size - (lba + blocks) * 512),
+                  "VERIFY leaves the writable image unchanged on disk")
+
+
 def _protocol_checks(ctx, lun0_size, lun1_size):
     # Discovery
     s = ctx.session(isid=0x23D000000010)
@@ -1978,7 +2071,7 @@ def test_gui(ctx):
                 f.write(saved_ini)
 
 
-TESTS = [test_cli_errors, test_protocol, test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
+TESTS = [test_cli_errors, test_protocol, test_verify, test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
          test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_optical_images,
          test_config_files, test_access, test_service, test_service_elevated, test_optical_elevated, test_devices_unprivileged,
          test_devices_elevated, test_dynamic_volumes, test_dynamic_volumes_elevated, test_gui]

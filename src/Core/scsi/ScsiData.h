@@ -11,6 +11,7 @@
 #include "Core/scsi/ScsiTypes.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,11 +19,12 @@ namespace tiscsi::scsi {
 
 using Bytes = std::vector<uint8_t>;
 
-// Fixed-format sense data (18 bytes).
+// Fixed-format sense data (18 bytes), or descriptor format for a 64-bit information field.
 struct SenseData {
     uint8_t senseKey = 0;
     uint8_t additionalSenseCode = 0;
     uint8_t additionalSenseCodeQualifier = 0;
+    std::optional<uint64_t> information;
 
     Bytes GetBytes() const;
 
@@ -36,6 +38,7 @@ struct SenseData {
     static SenseData DataProtect() { return {0x07, 0x27, 0x00}; }          // write protected
     static SenseData UnrecoveredReadError() { return {0x03, 0x11, 0x00}; } // medium error
     static SenseData WriteFault() { return {0x03, 0x03, 0x00}; }           // medium error
+    static SenseData Miscompare(uint64_t lba) { return {0x0E, 0x1D, 0x00, lba}; }
 };
 
 // Sense data as carried in an iSCSI SCSI Response: 2-byte length prefix.

@@ -51,6 +51,7 @@ constexpr uint8_t ReportLuns = 0xA0;
 constexpr uint8_t Read12 = 0xA8;
 constexpr uint8_t Write12 = 0xAA;
 constexpr uint8_t ReadDvdStructure = 0xAD; // MMC
+constexpr uint8_t Verify12 = 0xAF;
 constexpr uint8_t SetCdSpeed = 0xBB;       // MMC
 constexpr uint8_t MechanismStatus = 0xBD;  // MMC
 } // namespace op

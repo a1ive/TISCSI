@@ -39,10 +39,14 @@ def lun_bytes(lun):
 
 def sense_key(payload):
     """Sense key from a SCSI Response data segment (2-byte length prefix)."""
+    if len(payload) > 4 and payload[2] & 0x7F in (0x72, 0x73):
+        return payload[3] & 0x0F
     return payload[4] & 0x0F if len(payload) > 4 else None
 
 
 def asc(payload):
+    if len(payload) > 4 and payload[2] & 0x7F in (0x72, 0x73):
+        return payload[4]
     return payload[14] if len(payload) > 14 else None
 
 

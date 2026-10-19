@@ -27,6 +27,7 @@ struct Cdb {
     // and the MMC commands.
     uint32_t transferLength = 0;
     uint8_t control = 0;
+    uint8_t verifyFlags = 0; // VERIFY byte 1: VRPROTECT, DPO, BYTCHK, reserved bits
 
     // INQUIRY
     bool evpd = false;

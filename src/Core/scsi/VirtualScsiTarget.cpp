@@ -72,9 +72,11 @@ ScsiStatus VirtualScsiTarget::ExecuteCommand(const CdbBytes& cdbBytes, const Lun
     case op::TestUnitReady:
     case op::Reserve6:
     case op::Release6:
-    case op::Verify10:
-    case op::Verify16:
         return ScsiStatus::Good;
+    case op::Verify10:
+    case op::Verify12:
+    case op::Verify16:
+        return Verify(cdb, lun, data, response);
     case op::RequestSense:
         // Some initiators (e.g. EFI iSCSI DXE) send REQUEST SENSE right after connecting.
         response = FormatSenseData(SenseData::NoSense());
@@ -332,6 +334,67 @@ ScsiStatus VirtualScsiTarget::Write(const Cdb& cdb, uint16_t lun, std::span<cons
         m_log.Write(Severity::Error, "Write error: I/O failure");
         return CheckCondition(response, SenseData::WriteFault());
     }
+}
+
+ScsiStatus VirtualScsiTarget::Verify(const Cdb& cdb, uint16_t lun, std::span<const uint8_t> data, Bytes& response)
+{
+    disk::Disk& disk = *m_disks[lun];
+    const uint8_t byteCheck = (cdb.verifyFlags >> 1) & 0x03;
+    // No protection information or relative addressing. DPO is a cache-retention
+    // hint; this target has no read cache of its own. BYTCHK=2 is reserved in SBC.
+    // On MMC devices bit 2 is BLKVFY, not the high bit of SBC's BYTCHK field.
+    if ((cdb.verifyFlags & 0xE9) != 0 || byteCheck == 2 || (disk.IsOpticalDisc() && byteCheck == 3)) {
+        return CheckCondition(response, SenseData::InvalidFieldInCdb());
+    }
+    const uint32_t count = cdb.transferLength;
+    const uint32_t blockSize = disk.BytesPerSector();
+    const uint64_t expectedLength = count == 0 || byteCheck == 0 ? 0 :
+        byteCheck == 3 ? blockSize : static_cast<uint64_t>(count) * blockSize;
+    if (expectedLength > kMaximumTransferBytes || expectedLength != data.size()) {
+        return CheckCondition(response, SenseData::InvalidFieldInCdb());
+    }
+    // A zero verification length is a no-op, not a request to verify to the end.
+    if (count == 0) {
+        return ScsiStatus::Good;
+    }
+    const uint64_t total = disk.TotalSectors();
+    if (cdb.logicalBlockAddress >= total || count > total - cdb.logicalBlockAddress) {
+        return CheckCondition(response, SenseData::LbaOutOfRange());
+    }
+    // SBC requires pending writes to the referenced blocks to reach the medium.
+    // Disk::Flush has whole-disk granularity and is also safe on read-only disks.
+    if (disk.Flush() != disk::IoResult::Ok) {
+        return CheckCondition(response, SenseData::WriteFault());
+    }
+    constexpr uint32_t kVerifyChunkBytes = 1024 * 1024;
+    const uint32_t chunkBlocks = std::max(uint32_t{1}, kVerifyChunkBytes / blockSize);
+    Bytes buffer;
+    for (uint32_t done = 0; done < count;) {
+        const uint32_t blocks = std::min(count - done, chunkBlocks);
+        const size_t length = static_cast<size_t>(blocks) * blockSize;
+        switch (disk.ReadSectors(cdb.logicalBlockAddress + done, blocks, buffer)) {
+        case disk::IoResult::Ok:
+            break;
+        case disk::IoResult::OutOfRange:
+            return CheckCondition(response, SenseData::LbaOutOfRange());
+        default:
+            return CheckCondition(response, SenseData::UnrecoveredReadError());
+        }
+        if (buffer.size() != length) {
+            return CheckCondition(response, SenseData::UnrecoveredReadError());
+        }
+        if (byteCheck != 0) {
+            for (uint32_t block = 0; block < blocks; ++block) {
+                const size_t offset = byteCheck == 3 ? 0 : static_cast<size_t>(done + block) * blockSize;
+                const auto first = buffer.begin() + static_cast<size_t>(block) * blockSize;
+                if (!std::equal(first, first + blockSize, data.begin() + offset)) {
+                    return CheckCondition(response, SenseData::Miscompare(cdb.logicalBlockAddress + done + block));
+                }
+            }
+        }
+        done += blocks;
+    }
+    return ScsiStatus::Good;
 }
 
 ScsiStatus VirtualScsiTarget::SynchronizeCache(uint16_t lun, Bytes& response)
