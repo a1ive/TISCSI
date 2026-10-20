@@ -12,7 +12,7 @@ BEGIN
     IDS_CLI_USAGE "用法: TISCSICli [选项] [--target <名称>] <磁盘>... [--target <名称> <磁盘>...]...\n\n\
 向 iSCSI 发起程序提供磁盘映像和内存盘。\n\n\
 磁盘 (按指定顺序依次成为当前目标的 LUN):\n\
-  --image <路径>       磁盘映像，可读写 (.vhd、.vmdk；其他扩展名按原始映像处理)\n\
+  --image <路径>       磁盘映像，可读写 (.vhd、.vhdx、.avhdx、.vmdk；其他扩展名按原始映像处理)\n\
                        .iso 映像作为只读 CD/DVD-ROM 驱动器提供\n\
   --image-ro <路径>    磁盘映像，只读\n\
   --cdrom <路径>       将任意文件作为只读 CD/DVD-ROM 驱动器中的光盘提供\n\

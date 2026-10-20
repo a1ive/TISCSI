@@ -13,7 +13,7 @@ BEGIN
     IDS_CLI_USAGE "Usage: TISCSICli [options] [--target <name>] <disk>... [--target <name> <disk>...]...\n\n\
 Serves disk images and RAM disks to iSCSI initiators.\n\n\
 Disks (each one becomes the next LUN of the current target):\n\
-  --image <path>       Disk image, read-write (.vhd, .vmdk; other extensions: raw)\n\
+  --image <path>       Disk image, read-write (.vhd, .vhdx, .avhdx, .vmdk; other extensions: raw)\n\
                        An .iso image is a read-only CD/DVD-ROM drive\n\
   --image-ro <path>    Disk image, read-only\n\
   --cdrom <path>       Any file as the disc in a read-only CD/DVD-ROM drive\n\

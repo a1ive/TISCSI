@@ -56,6 +56,7 @@
     <ClInclude Include="config\ConfigFile.h" />
     <ClInclude Include="disk\Vmdk.h" />
     <ClInclude Include="disk\Vhd.h" />
+    <ClInclude Include="disk\Vhdx.h" />
     <ClInclude Include="disk\DiskImage.h" />
     <ClInclude Include="disk\File.h" />
     <ClInclude Include="disk\RawDiskImage.h" />
@@ -93,6 +94,7 @@
     <ClCompile Include="config\ConfigFile.cpp" />
     <ClCompile Include="disk\Vmdk.cpp" />
     <ClCompile Include="disk\Vhd.cpp" />
+    <ClCompile Include="disk\Vhdx.cpp" />
     <ClCompile Include="disk\DiskImage.cpp" />
     <ClCompile Include="disk\File.cpp" />
     <ClCompile Include="disk\RamDisk.cpp" />

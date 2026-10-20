@@ -6,6 +6,7 @@
 #include "Core/disk/IsoImage.h"
 #include "Core/disk/RawDiskImage.h"
 #include "Core/disk/Vhd.h"
+#include "Core/disk/Vhdx.h"
 #include "Core/disk/Vmdk.h"
 
 namespace tiscsi::disk {
@@ -27,6 +28,9 @@ std::unique_ptr<Disk> OpenDiskImage(const std::wstring& path, bool readOnly, Ope
 
 std::unique_ptr<Disk> detail::OpenDiskImage(const std::wstring& path, bool readOnly, OpenError& error, int depth)
 {
+    if (HasExtension(path, L".vhdx") || HasExtension(path, L".avhdx")) {
+        return VhdxDisk::Open(path, readOnly, error, depth);
+    }
     if (HasExtension(path, L".vhd")) {
         return VhdDisk::Open(path, readOnly, error, depth);
     }

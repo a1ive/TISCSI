@@ -2,8 +2,8 @@
 // Copyright (C) 2026 A1ive
 //
 // Opens a disk image file by extension, like DiskAccessLibrary's
-// DiskImage.GetDiskImage: .vhd, .vmdk, .iso (a CD/DVD-ROM disc), anything
-// else is a raw image.
+// DiskImage.GetDiskImage: .vhd, .vhdx / .avhdx, .vmdk, .iso (a CD/DVD-ROM
+// disc), anything else is a raw image.
 
 #pragma once
 

@@ -205,7 +205,7 @@ BEGIN
     IDS_READ_ONLY_SUFFIX    " (읽기 전용)"
     IDS_ERR_INVALID_TARGET_NAME "대상 이름이 올바른 iSCSI 이름이 아닙니다.\n\niqn.yyyy-mm.역순도메인[:이름] 또는 eui.<16자리 16진수> 형식을 사용하십시오."
     IDS_ERR_NO_DISKS        "대상에 디스크를 하나 이상 추가하십시오."
-    IDS_FILTER_IMAGES       "디스크 이미지 (*.vhd;*.vmdk;*.img;*.iso)|*.vhd;*.vmdk;*.img;*.iso|모든 파일 (*.*)|*.*|"
+    IDS_FILTER_IMAGES       "디스크 이미지 (*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso)|*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso|모든 파일 (*.*)|*.*|"
     IDS_FILTER_VHD          "가상 하드 디스크 (*.vhd)|*.vhd|"
     IDS_ERR_NO_FILE         "파일을 선택하십시오."
     IDS_ERR_OPEN_IMAGE      "디스크 이미지 {0}을(를) 열 수 없습니다:\n{1}"

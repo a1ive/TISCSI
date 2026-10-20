@@ -10,6 +10,7 @@ python tests\run_tests.py --exe bin\Win32\Release\TISCSICli.exe
 python tests\run_tests.py -k protocol
 python tests\run_tests.py -k verify
 python tests\run_tests.py -k synchronize_cache
+python tests\run_tests.py -k vhdx
 ```
 
 VERIFY tests cover READ-style medium verification and byte comparisons for
@@ -50,6 +51,32 @@ They are looked up in their default install locations or through the
 `TISCSI_QEMU_IMG` / `TISCSI_VDISKMANAGER` environment variables.
 Differencing VHDs are created by `vhd_tool.py`, an independent spec-based
 helper, because the Microsoft tools for that need administrator rights.
+
+VHDX tests compare fixed/dynamic images and written data with QEMU. They also
+ask QEMU to replay a BAT log emitted by TISCSI after deliberately damaging
+its destination sector. `vhdx_tool.py` creates specification fixtures for
+512/4096-byte sectors, partial differencing blocks, multilevel chains,
+ZERO/UNDEFINED/UNMAPPED blocks, bitmap boundaries and a sparse 64 TiB disk.
+Checks include parent hashes, stale/missing parents, cycles, redundant
+headers/tables, malformed offsets, overlapping regions and unknown required
+metadata. These fixtures do not replace testing Hyper-V-created checkpoints.
+
+The native failure test intercepts Win32 writes, flushes and file expansion
+in the production `File` implementation. It fails each mutation in a block
+allocation, with and without a durable partial write, and verifies that the
+backend stops I/O after failure. The Python runner then uses QEMU to recover
+each snapshot and checks the entire virtual disk against the old and new
+contents. From an **x64 Native Tools Command Prompt** after a Debug x64 build:
+
+```bat
+cl /nologo /std:c++20 /EHsc /W4 /WX /utf-8 /MTd /D_DEBUG /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DNOMINMAX /D_WIN32_WINNT=0x0501 /I src tests\vhdx_faults.cpp bin\x64\Debug\Core.lib ole32.lib /Fo:bin\x64\Debug\vhdx_faults.obj /Fe:bin\x64\Debug\vhdx_faults.exe /link /DEBUG
+python tests\check_vhdx_faults.py --exe bin\x64\Debug\vhdx_faults.exe
+```
+
+The runner accepts `--qemu-img PATH` or `TISCSI_QEMU_IMG`. All failure images
+are disposable copies in a temporary directory. This tests file-operation
+failures and torn writes, not hardware power loss. VHDX layout and journal
+rules follow [Microsoft MS-VHDX v8.0](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-vhdx/83e061f8-f6e2-4de1-91bd-5d518a43d477).
 
 Dynamic volume tests use images of LDM disks built by `ldm_tool.py` (every
 layout, degraded volumes, damaged header copies).

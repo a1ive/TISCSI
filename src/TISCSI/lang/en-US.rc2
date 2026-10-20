@@ -203,7 +203,7 @@ BEGIN
     IDS_READ_ONLY_SUFFIX    " (read-only)"
     IDS_ERR_INVALID_TARGET_NAME "The target name is not a valid iSCSI name.\n\nUse iqn.yyyy-mm.reversed.domain[:name] or eui.<16 hex digits>."
     IDS_ERR_NO_DISKS        "Add at least one disk to the target."
-    IDS_FILTER_IMAGES       "Disk images (*.vhd;*.vmdk;*.img;*.iso)|*.vhd;*.vmdk;*.img;*.iso|All files (*.*)|*.*|"
+    IDS_FILTER_IMAGES       "Disk images (*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso)|*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso|All files (*.*)|*.*|"
     IDS_FILTER_VHD          "Virtual hard disks (*.vhd)|*.vhd|"
     IDS_ERR_NO_FILE         "Choose a file."
     IDS_ERR_OPEN_IMAGE      "Cannot open the disk image {0}:\n{1}"

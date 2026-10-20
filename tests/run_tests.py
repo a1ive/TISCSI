@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import iso_tool  # noqa: E402
 import ldm_tool  # noqa: E402
 import vhd_tool  # noqa: E402
+from test_vhdx import test_vhdx  # noqa: E402
 from initiator import DEFAULT_INITIATOR, Session, asc, cdb10, cdb16, sense_key  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -2102,7 +2103,7 @@ def test_gui(ctx):
 
 TESTS = [test_cli_errors, test_protocol, test_verify, test_synchronize_cache,
          test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
-         test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_optical_images,
+         test_vhdx, test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_optical_images,
          test_config_files, test_access, test_service, test_service_elevated, test_optical_elevated, test_devices_unprivileged,
          test_devices_elevated, test_dynamic_volumes, test_dynamic_volumes_elevated, test_gui]
 

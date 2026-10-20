@@ -20,6 +20,8 @@ by Tal Aloni (C#, LGPL-3.0-or-later) to the Win32 API and modern C++.
 - Reference sources live in `ref/` (git-ignored): `ref/iSCSIConsole` and
   `ref/DiskAccessLibrary` (the LDM code was ported from the latter). The VHD
   and VMDK code was written from the public format specifications instead.
+  VHDX follows Microsoft [MS-VHDX] v8.0; `ref/VirtualBox-7.2.20` was consulted
+  for its read-only backend and supported format boundaries.
 
 ## Build
 
@@ -73,7 +75,7 @@ python tests\run_tests.py -k dynamic_volumes
 | `src/Common` | Front-end helpers: i18n resource loader, text / error formatting, log file |
 | `src/Core/util` | Byte order, blocking queue, logging, iSCSI key=value text |
 | `src/Core/config` | `ServerConfig` (targets, disks, server options) shared by the front ends; `OpenDisk`, stable names; configuration files |
-| `src/Core/disk` | `Disk` interface, raw / VHD / VMDK / ISO images, RAM disk, `OpenDiskImage`, physical disks, volumes, device enumeration, stable device names (`DeviceSelector`) |
+| `src/Core/disk` | `Disk` interface, raw / VHD / VHDX / VMDK / ISO images, RAM disk, `OpenDiskImage`, physical disks, volumes, device enumeration, stable device names (`DeviceSelector`) |
 | `src/Core/ldm` | LDM database parsing, disk groups, `DynamicVolume`, `ListDynamicVolumes` / `OpenDynamicVolume` |
 | `src/Core/scsi` | CDB parsing, SCSI and MMC (CD/DVD) response data, `VirtualScsiTarget`, `SptiTarget` |
 | `src/Core/iscsi` | PDUs, sessions, connections, `IscsiTarget`, `IscsiServer` |
@@ -173,9 +175,20 @@ These are deliberate. Don't "fix" them back to the original behavior.
   target (`ScsiCommandQueue`). One housekeeping thread for NOP-In keep-alive
   and session expiry. `IscsiServer::Stop()` waits for every connection
   thread (live-connection list).
-- Images are chosen by extension (`.vhd`, `.vmdk`, `.iso`, else raw).
-  Read-write images are opened exclusively; differencing parents are
-  read-only and are verified by UniqueId (VHD) or CID (VMDK).
+- Images are chosen by extension (`.vhd`, `.vhdx` / `.avhdx`, `.vmdk`,
+  `.iso`, else raw). Read-write images are opened exclusively; differencing
+  parents are read-only and verified by UniqueId (VHD), DataWriteGuid (VHDX)
+  or CID (VMDK).
+- VHDX supports fixed, dynamic and differencing images, 512/4096-byte logical
+  sectors and up to 64 TiB. Partial child blocks use the sector bitmap for
+  reads; writes materialize a full block before journaling its BAT entry.
+  Header changes use both copies with CRC32C and flushes. The first BAT
+  update per writable session appends a fresh 1 MiB log region, preserving a
+  valid checkpoint before publishing its LogGuid. Old log regions remain
+  unused. Failed writes latch an error until close. Pending logs are refused
+  with ERROR_NOT_SUPPORTED and require recovery by an external VHDX tool.
+  `--create-vhd` still creates VHD. `tests/vhdx_tool.py` builds VHDX fixtures;
+  `tests/vhdx_faults.cpp` injects file write/flush/resize failures.
 - Optical discs: `Disk::IsOpticalDisc()` makes `VirtualScsiTarget` report
   device type 5 and answer MMC commands (`scsi/MmcData`) for a finalized
   single-session disc with one data track. Up to 80 minutes (360000 sectors)
@@ -303,4 +316,7 @@ These are deliberate. Don't "fix" them back to the original behavior.
 - Manual checks on XP / Windows 7, including the CJK font fallback (SimSun,
   PMingLiU, Gulim on XP).
 - Not supported: compressed (streamOptimized) VMDK, VMFSSPARSE / SESPARSE,
-  raw device mappings, VHDX.
+  raw device mappings, VHDX log replay or VHDX creation.
+- VHDX differencing and 4K-sector coverage uses specification fixtures.
+  Hyper-V-created checkpoint chains and XP / Windows 7 runtime behavior
+  need maintainer validation.

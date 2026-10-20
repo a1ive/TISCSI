@@ -61,13 +61,15 @@ cannot be opened are listed and left out.
 ## Command line
 
 `TISCSICli.exe` serves disk images and RAM disks. Images are recognized by
-extension: VHD (fixed, dynamic, differencing), VMDK (sparse, flat, split,
-delta), ISO (served as a read-only CD/DVD-ROM drive) and raw images for
+extension: VHD and VHDX (fixed, dynamic, differencing), VMDK (sparse, flat,
+split, delta), ISO (served as a read-only CD/DVD-ROM drive) and raw images for
 anything else. `--cdrom` serves any file as a CD/DVD-ROM regardless of its
 extension. Each disk becomes the next LUN of the current target:
 
 ```bat
 TISCSICli --target iqn.2026-10.example:disk1 --image D:\disk.vhd --ram 1G
+TISCSICli --image D:\disk.vhdx
+TISCSICli --image D:\checkpoint.avhdx
 TISCSICli --listen 192.168.1.10 --port 3260 --image-ro D:\install.vmdk --log tiscsi.log
 TISCSICli --target iqn.2026-10.example:setup --image D:\setup.iso --cdrom D:\drivers.img
 TISCSICli --create-vhd D:\new.vhd --size 20G --dynamic --image D:\new.vhd
@@ -122,6 +124,25 @@ TISCSICli --ldm-disk D:\disk1.vhd --ldm-disk D:\disk2.vhd --dynamic-volume {6a2d
 
 Disks given before any `--target` belong to
 `iqn.1991-05.com.microsoft:target1`, the same default as iSCSI Console.
+
+VHDX files (`.vhdx` and `.avhdx`) support read-write and read-only access,
+512-byte and 4096-byte logical sectors, and virtual sizes up to 64 TiB.
+Differencing parents are opened read-only and checked against the child's
+stored `DataWriteGuid`, size and logical sector size. Keep the parent chain
+available at its recorded relative or Windows path. `--create-vhd` creates
+VHD files; create VHDX files with an external tool.
+
+VHDX files with a pending recovery log are refused with error 50
+(`ERROR_NOT_SUPPORTED`). Recover such a file with a VHDX tool before serving
+it. For a standalone VHDX, QEMU can replay the log with
+`qemu-img check -r all disk.vhdx`; work on a backup copy first. QEMU's VHDX
+backend does not support differencing chains, so recover those with the
+software that created them. TISCSI logs its own block-map updates, but does
+not replay logs on open. The first block-map update in each writable session
+appends a fresh 1 MiB log region; older log regions remain unused in the file.
+Writing an absent or partially present child block allocates a full payload
+block, including its inherited sectors.
+
 Read-write images are opened exclusively. Stop the server with Ctrl+C.
 Run `TISCSICli --help` for all options.
 

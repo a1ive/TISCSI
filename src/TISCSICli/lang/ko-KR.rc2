@@ -12,7 +12,7 @@ BEGIN
     IDS_CLI_USAGE "사용법: TISCSICli [옵션] [--target <이름>] <디스크>... [--target <이름> <디스크>...]...\n\n\
 디스크 이미지와 RAM 디스크를 iSCSI 이니시에이터에 제공합니다.\n\n\
 디스크 (지정한 순서대로 현재 대상의 다음 LUN이 됩니다):\n\
-  --image <경로>       디스크 이미지, 읽기/쓰기 (.vhd, .vmdk, 그 밖의 확장명은 원시 이미지)\n\
+  --image <경로>       디스크 이미지, 읽기/쓰기 (.vhd, .vhdx, .avhdx, .vmdk, 그 밖의 확장명은 원시 이미지)\n\
                        .iso 이미지는 읽기 전용 CD/DVD-ROM 드라이브가 됩니다\n\
   --image-ro <경로>    디스크 이미지, 읽기 전용\n\
   --cdrom <경로>       임의의 파일을 읽기 전용 CD/DVD-ROM 드라이브의 디스크로 제공\n\
