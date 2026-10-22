@@ -178,7 +178,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "TISCSI"
     IDS_ABOUT_VERSION       "版本 {0}"
-    IDS_USAGE               "命令行选项:\n\n/log\t在程序所在文件夹中写入日志文件\n--log=<文件>\t将日志写入指定文件\n--lang=<标记>\t界面语言 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)\n--config=<文件>\t打开配置文件并启动服务器"
+    IDS_USAGE               "命令行选项:\n\n/log\t在程序所在文件夹中写入日志文件\n--log=<文件>\t将日志写入指定文件\n--lang=<标记>\t界面语言 (en-US、ja-JP、zh-CN、zh-TW、ko-KR、tr-TR)\n--config=<文件>\t打开配置文件并启动服务器"
     IDS_ERR_LOG_FILE        "无法打开日志文件 {0}:\n{1}"
 
     IDS_ANY_ADDRESS         "任意"

@@ -176,7 +176,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "TISCSI"
     IDS_ABOUT_VERSION       "Version {0}"
-    IDS_USAGE               "Command line options:\n\n/log\tWrite a log file to the program directory\n--log=<file>\tWrite a log to the given file\n--lang=<tag>\tUser interface language (en-US, ja-JP, zh-CN, zh-TW, ko-KR)\n--config=<file>\tOpen a configuration file and start the server"
+    IDS_USAGE               "Command line options:\n\n/log\tWrite a log file to the program directory\n--log=<file>\tWrite a log to the given file\n--lang=<tag>\tUser interface language (en-US, ja-JP, zh-CN, zh-TW, ko-KR, tr-TR)\n--config=<file>\tOpen a configuration file and start the server"
     IDS_ERR_LOG_FILE        "Cannot open the log file {0}:\n{1}"
 
     IDS_ANY_ADDRESS         "Any"

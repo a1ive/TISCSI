@@ -178,7 +178,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "TISCSI"
     IDS_ABOUT_VERSION       "バージョン {0}"
-    IDS_USAGE               "コマンド ライン オプション:\n\n/log\tプログラムのフォルダーにログ ファイルを書き込みます\n--log=<ファイル>\t指定したファイルにログを書き込みます\n--lang=<タグ>\t表示言語 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)\n--config=<ファイル>\t構成ファイルを開いてサーバーを開始します"
+    IDS_USAGE               "コマンド ライン オプション:\n\n/log\tプログラムのフォルダーにログ ファイルを書き込みます\n--log=<ファイル>\t指定したファイルにログを書き込みます\n--lang=<タグ>\t表示言語 (en-US、ja-JP、zh-CN、zh-TW、ko-KR、tr-TR)\n--config=<ファイル>\t構成ファイルを開いてサーバーを開始します"
     IDS_ERR_LOG_FILE        "ログ ファイル {0} を開けません:\n{1}"
 
     IDS_ANY_ADDRESS         "すべて"

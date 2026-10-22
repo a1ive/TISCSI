@@ -1,0 +1,274 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 A1ive
+//
+// Turkish (Türkiye). {0}, {1}, ... are std::format arguments.
+
+#pragma code_page(65001)
+
+LANGUAGE LANG_TURKISH, SUBLANG_TURKISH_TURKEY
+
+IDR_MAINMENU MENU
+BEGIN
+    POPUP "&Dosya"
+    BEGIN
+        MENUITEM "Yapılandırma &Aç...", IDM_FILE_OPEN_CONFIG
+        MENUITEM "Yapılandırmayı &Farklı Kaydet...", IDM_FILE_SAVE_CONFIG
+        MENUITEM SEPARATOR
+        MENUITEM "Çı&kış", IDM_FILE_EXIT
+    END
+    POPUP "&Görünüm"
+    BEGIN
+        POPUP "&Dil"
+        BEGIN
+            MENUITEM "&Otomatik", IDM_LANG_AUTO
+            MENUITEM SEPARATOR
+        END
+    END
+    POPUP "&Yardım"
+    BEGIN
+        MENUITEM "TISCSI &Hakkında...", IDM_HELP_ABOUT
+    END
+END
+
+IDD_MAIN DIALOGEX 0, 0, 350, 120
+STYLE DS_SHELLFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+CAPTION "TISCSI"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "&IP adresi:", IDC_STATIC, 7, 9, 45, 8
+    COMBOBOX        IDC_ADDRESS, 54, 7, 142, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "TCP &portu:", IDC_STATIC, 203, 9, 37, 8
+    EDITTEXT        IDC_PORT, 241, 7, 35, 13, ES_NUMBER | ES_AUTOHSCROLL
+    PUSHBUTTON      "&Başlat", IDC_START, 283, 6, 60, 15
+    LTEXT           "&Hedefler:", IDC_STATIC, 7, 30, 45, 8
+    CONTROL         "", IDC_TARGETS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 40, 269, 74
+    PUSHBUTTON      "Hedef &Ekle...", IDC_ADD_TARGET, 283, 40, 60, 15
+    PUSHBUTTON      "Hedefi &Kaldır", IDC_REMOVE_TARGET, 283, 58, 60, 15
+END
+
+IDD_ADD_TARGET DIALOGEX 0, 0, 316, 170
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "iSCSI Hedefi Ekle"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "Hedef &adı:", IDC_STATIC, 7, 9, 50, 8
+    EDITTEXT        IDC_TARGET_NAME, 58, 7, 172, 13, ES_AUTOHSCROLL
+    LTEXT           "&Diskler:", IDC_STATIC, 7, 27, 50, 8
+    CONTROL         "", IDC_DISKS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 58, 26, 172, 102
+    PUSHBUTTON      "&Sanal Disk Oluştur...", IDC_CREATE_VHD, 236, 26, 73, 14
+    PUSHBUTTON      "&RAM Diski Oluştur...", IDC_CREATE_RAMDISK, 236, 43, 73, 14
+    PUSHBUTTON      "Disk &Görüntüsü Ekle...", IDC_ADD_IMAGE, 236, 60, 73, 14
+    PUSHBUTTON      "&Fiziksel Disk Ekle...", IDC_ADD_PHYSICAL, 236, 77, 73, 14
+    PUSHBUTTON      "&Birim Ekle...", IDC_ADD_VOLUME, 236, 94, 73, 14
+    PUSHBUTTON      "Ka&ldır", IDC_REMOVE_DISK, 236, 111, 73, 14
+    PUSHBUTTON      "Erişi&m...", IDC_ACCESS, 58, 133, 60, 14
+    LTEXT           "", IDC_ACCESS_SUMMARY, 123, 136, 186, 8, SS_NOPREFIX | SS_ENDELLIPSIS
+    DEFPUSHBUTTON   "Tamam", IDOK, 202, 151, 50, 14
+    PUSHBUTTON      "İptal", IDCANCEL, 259, 151, 50, 14
+END
+
+IDD_TARGET_ACCESS DIALOGEX 0, 0, 260, 233
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Erişim Denetimi"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "İzin verilen &başlatıcılar: her satıra bir iSCSI adı girin. Tümüne izin vermek için boş bırakın.", IDC_STATIC, 7, 7, 246, 16
+    EDITTEXT        IDC_ALLOWED_INITIATORS, 7, 25, 246, 44, ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
+    GROUPBOX        "CHAP kimlik doğrulaması", IDC_STATIC, 7, 75, 246, 49
+    LTEXT           "&Ad:", IDC_STATIC, 15, 89, 58, 8
+    EDITTEXT        IDC_CHAP_USER, 75, 87, 170, 13, ES_AUTOHSCROLL
+    LTEXT           "&Parola:", IDC_STATIC, 15, 106, 58, 8
+    EDITTEXT        IDC_CHAP_SECRET, 75, 104, 170, 13, ES_PASSWORD | ES_AUTOHSCROLL
+    GROUPBOX        "Karşılıklı CHAP (hedefin adı ve parolası)", IDC_STATIC, 7, 130, 246, 49
+    LTEXT           "A&d:", IDC_STATIC, 15, 144, 58, 8
+    EDITTEXT        IDC_MUTUAL_USER, 75, 142, 170, 13, ES_AUTOHSCROLL
+    LTEXT           "Pa&rola:", IDC_STATIC, 15, 161, 58, 8
+    EDITTEXT        IDC_MUTUAL_SECRET, 75, 159, 170, 13, ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT           "Parolalar 12 ile 255 karakter uzunluğundadır. CHAP adı boşsa tüm adlar kabul edilir. Karşılıklı CHAP adı boşsa hedef adı gönderilir.", IDC_STATIC, 7, 185, 246, 24
+    DEFPUSHBUTTON   "Tamam", IDOK, 146, 213, 50, 14
+    PUSHBUTTON      "İptal", IDCANCEL, 203, 213, 50, 14
+END
+
+IDD_SELECT_IMAGE DIALOGEX 0, 0, 244, 78
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Disk Görüntüsü Ekle"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "&Dosya:", IDC_STATIC, 7, 9, 26, 8
+    EDITTEXT        IDC_PATH, 35, 7, 146, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "&Gözat...", IDC_BROWSE, 187, 6, 50, 15
+    AUTOCHECKBOX    "&Salt okunur", IDC_READ_ONLY, 35, 27, 180, 10
+    AUTOCHECKBOX    "&CD/DVD-ROM sürücüsü olarak sun", IDC_OPTICAL, 35, 41, 180, 10
+    DEFPUSHBUTTON   "Tamam", IDOK, 130, 58, 50, 14
+    PUSHBUTTON      "İptal", IDCANCEL, 187, 58, 50, 14
+END
+
+IDD_CREATE_VHD DIALOGEX 0, 0, 244, 96
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Sanal Disk Oluştur"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "&Dosya:", IDC_STATIC, 7, 9, 26, 8
+    EDITTEXT        IDC_PATH, 35, 7, 146, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "&Gözat...", IDC_BROWSE, 187, 6, 50, 15
+    LTEXT           "&Boyut:", IDC_STATIC, 7, 28, 26, 8
+    EDITTEXT        IDC_SIZE_MB, 35, 26, 60, 13, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 95, 26, 10, 13
+    LTEXT           "MB", IDC_STATIC, 100, 28, 20, 8
+    AUTOCHECKBOX    "&Dinamik olarak genişleyen", IDC_DYNAMIC, 35, 45, 160, 10
+    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 61, 230, 9
+    DEFPUSHBUTTON   "Tamam", IDOK, 130, 76, 50, 14
+    PUSHBUTTON      "İptal", IDCANCEL, 187, 76, 50, 14
+END
+
+IDD_CREATE_RAMDISK DIALOGEX 0, 0, 180, 50
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "RAM Diski Oluştur"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "&Boyut:", IDC_STATIC, 7, 9, 26, 8
+    EDITTEXT        IDC_SIZE_MB, 35, 7, 60, 13, ES_NUMBER | ES_AUTOHSCROLL
+    CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 95, 7, 10, 13
+    LTEXT           "MB", IDC_STATIC, 100, 9, 20, 8
+    DEFPUSHBUTTON   "Tamam", IDOK, 66, 30, 50, 14
+    PUSHBUTTON      "İptal", IDCANCEL, 123, 30, 50, 14
+END
+
+IDD_SELECT_PHYSICAL DIALOGEX 0, 0, 316, 150
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Fiziksel Disk Ekle"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    CONTROL         "", IDC_DEVICE_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 302, 116
+    AUTOCHECKBOX    "&Salt okunur", IDC_READ_ONLY, 7, 132, 120, 10
+    DEFPUSHBUTTON   "Tamam", IDOK, 202, 130, 50, 14
+    PUSHBUTTON      "İptal", IDCANCEL, 259, 130, 50, 14
+END
+
+IDD_SELECT_VOLUME DIALOGEX 0, 0, 380, 150
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Birim Ekle"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    CONTROL         "", IDC_DEVICE_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 366, 116
+    AUTOCHECKBOX    "&Salt okunur", IDC_READ_ONLY, 7, 132, 120, 10
+    DEFPUSHBUTTON   "Tamam", IDOK, 266, 130, 50, 14
+    PUSHBUTTON      "İptal", IDCANCEL, 323, 130, 50, 14
+END
+
+IDD_ABOUT DIALOGEX 0, 0, 260, 118
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "TISCSI Hakkında"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    ICON            IDI_APP, IDC_STATIC, 10, 10, 20, 20
+    LTEXT           "TISCSI", IDC_STATIC, 42, 10, 208, 8
+    LTEXT           "", IDC_ABOUT_VERSION, 42, 22, 208, 8
+    LTEXT           "Copyright (C) 2026 A1ive", IDC_STATIC, 42, 34, 208, 8
+    LTEXT           "Tal Aloni'nin iSCSI Console yazılımını temel alır.", IDC_STATIC, 42, 46, 208, 8
+    LTEXT           "Bu program özgür yazılımdır; GNU Genel Kamu Lisansı'nın 3. sürümü veya (tercihinize bağlı olarak) sonraki bir sürümü kapsamında dağıtılır.", IDC_STATIC, 42, 62, 208, 26
+    DEFPUSHBUTTON   "Tamam", IDOK, 200, 96, 50, 14
+END
+
+STRINGTABLE
+BEGIN
+    IDS_APP_TITLE           "TISCSI"
+    IDS_ABOUT_VERSION       "Sürüm {0}"
+    IDS_USAGE               "Komut satırı seçenekleri:\n\n/log\tProgram klasörüne günlük dosyası yaz\n--log=<file>\tBelirtilen dosyaya günlük yaz\n--lang=<tag>\tArayüz dili (en-US, ja-JP, zh-CN, zh-TW, ko-KR, tr-TR)\n--config=<file>\tYapılandırma dosyasını aç ve sunucuyu başlat"
+    IDS_ERR_LOG_FILE        "{0} günlük dosyası açılamadı:\n{1}"
+
+    IDS_ANY_ADDRESS         "Tümü"
+    IDS_START               "&Başlat"
+    IDS_STOP                "&Durdur"
+    IDS_COL_TARGET          "Hedef"
+    IDS_COL_LUNS            "LUN'lar"
+    IDS_COL_SESSIONS        "Oturumlar"
+    IDS_STATUS_STOPPED      "Sunucu durduruldu."
+    IDS_STATUS_RUNNING      "{0}:{1} dinleniyor - {2} etkin oturum"
+    IDS_STATUS_NOT_ADMIN    "Fiziksel diskler ve birimler yönetici hakları gerektirdiğinden devre dışı bırakıldı."
+    IDS_ERR_INVALID_PORT    "1 ile 65535 arasında bir TCP bağlantı noktası girin."
+    IDS_ERR_START           "Sunucu başlatılamadı:\n{0}"
+    IDS_ERR_TARGET_EXISTS   "{0} adlı bir hedef zaten var."
+    IDS_ERR_TARGET_IN_USE   "{0} hedefi kullanımda olduğundan kaldırılamaz."
+    IDS_CONFIRM_EXIT        "Başlatıcılar hâlâ bağlı. Sunucu durdurulup çıkılsın mı?"
+    IDS_COL_ACCESS          "Erişim"
+
+    IDS_COL_DESCRIPTION     "Açıklama"
+    IDS_COL_SIZE            "Boyut"
+    IDS_DESC_RAM_DISK       "RAM diski"
+    IDS_DESC_PHYSICAL_DISK  "Fiziksel disk {0}"
+    IDS_DESC_VOLUME         "Birim {0}"
+    IDS_READ_ONLY_SUFFIX    " (salt okunur)"
+    IDS_ERR_INVALID_TARGET_NAME "Hedef adı geçerli bir iSCSI adı değil.\n\niqn.yyyy-mm.reversed.domain[:name] veya eui.<16 onaltılık basamak> kullanın."
+    IDS_ERR_NO_DISKS        "Hedefe en az bir disk ekleyin."
+    IDS_FILTER_IMAGES       "Disk görüntüleri (*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso)|*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso|Tüm dosyalar (*.*)|*.*|"
+    IDS_FILTER_VHD          "Sanal sabit diskler (*.vhd)|*.vhd|"
+    IDS_ERR_NO_FILE         "Bir dosya seçin."
+    IDS_ERR_OPEN_IMAGE      "{0} disk görüntüsü açılamadı:\n{1}"
+    IDS_ERR_OPEN_DEVICE     "{0} açılamadı:\n{1}"
+    IDS_ERR_DYNAMIC_DISK    "{0} bir dinamik disktir. Başlatıcıdan bu diske yazmak dinamik disk veritabanını bozabilir; diski salt okunur olarak ekleyin."
+    IDS_ERR_VOLUME_LOCKED   "{0} birimi özel erişim için kilitlenemedi ({1}). Birimi kullanan programları kapatın veya birimi salt okunur olarak ekleyin."
+    IDS_ERR_ALREADY_SERVED  "{0} zaten sunuluyor."
+    IDS_ERR_WRITE_PROTECTED "{0} yazmaya karşı korumalı; salt okunur olarak ekleyin."
+    IDS_HINT_ADMIN          "Fiziksel diskleri ve birimleri kullanmak için TISCSI'yi yönetici olarak çalıştırın."
+    IDS_ERR_INVALID_SIZE    "{0} ile {1} MB arasında bir boyut girin."
+    IDS_ERR_CREATE          "{0} oluşturulamadı:\n{1}"
+    IDS_ERR_RAM_ALLOC       "{0} boyutunda RAM diski için yeterli bellek yok."
+    IDS_COL_DISK            "Disk"
+    IDS_COL_SERIAL          "Seri numarası"
+    IDS_DYNAMIC_SUFFIX      " (dinamik disk)"
+    IDS_ERR_NO_SELECTION    "Listeden bir öğe seçin."
+    IDS_CONFIRM_LOCK_DISK   "Hedef var olduğu sürece {0} diskindeki şu birimler kilitlenecek ve çıkarılacak:\n\n{1}\nDevam edilsin mi?"
+    IDS_COL_VOLUME          "Birim"
+    IDS_COL_LABEL           "Etiket"
+    IDS_COL_FILE_SYSTEM     "Dosya sistemi"
+    IDS_COL_TYPE            "Tür"
+    IDS_TYPE_BASIC          "Temel"
+    IDS_TYPE_DYNAMIC        "Dinamik"
+    IDS_LAYOUT_SIMPLE       "Basit"
+    IDS_LAYOUT_SPANNED      "Dağıtılmış"
+    IDS_LAYOUT_STRIPED      "Şeritli"
+    IDS_LAYOUT_MIRRORED     "Yansıtılmış"
+    IDS_LAYOUT_RAID5        "RAID-5"
+    IDS_HEALTH_FAILED_REDUNDANCY " (Yedeklilik başarısız)"
+    IDS_HEALTH_FAILED       " (Başarısız)"
+    IDS_UNMOUNTED_VOLUME    "{1} içinde {0} (Windows tarafından bağlanmamış)"
+    IDS_DESC_DYNAMIC_VOLUME "Dinamik birim {0}"
+    IDS_ERR_NO_SUCH_VOLUME  "{0} dinamik birimi bulunamadı. Diskler değişmiş olabilir; bu pencereyi yeniden açın."
+    IDS_ERR_AMBIGUOUS_VOLUME "{0} adında birden fazla dinamik birim var."
+    IDS_ERR_VOLUME_FAILED   "{0} dinamik birimi kullanılamıyor: verilerini içeren diskler eksik."
+    IDS_ERR_DEGRADED_WRITE  "{0} dinamik biriminin bir üye diski eksik. Birime yazmak üyeleri tutarsız bırakır; birimi salt okunur olarak ekleyin."
+    IDS_ACCESS_ANY          "Tümü"
+    IDS_ACCESS_INITIATORS   "Başlatıcı listesi"
+    IDS_ACCESS_CHAP         "CHAP"
+    IDS_ACCESS_MUTUAL_CHAP  "Karşılıklı CHAP"
+    IDS_ACCESS_BOTH         "{0} + {1}"
+    IDS_ERR_CHAP_SECRET_LENGTH "CHAP parolaları {0} ile {1} karakter uzunluğunda olmalıdır."
+    IDS_ERR_CHAP_NO_SECRET  "Bir CHAP parolası girin. CHAP adı ve karşılıklı CHAP için bu parola gereklidir."
+    IDS_ERR_MUTUAL_NO_SECRET "Karşılıklı CHAP adı için bir karşılıklı CHAP parolası girin."
+    IDS_ERR_MUTUAL_SAME_SECRET "Karşılıklı CHAP parolası, CHAP parolasından farklı olmalıdır."
+    IDS_FILTER_CONFIG       "TISCSI yapılandırmaları (*.conf)|*.conf|Tüm dosyalar (*.*)|*.*|"
+    IDS_ERR_CONFIG_READ     "{0} yapılandırma dosyası okunamadı:\n{1}"
+    IDS_ERR_CONFIG_LINE     "{0}, satır {1}:\n{2}"
+    IDS_ERR_CONFIG_FILE     "{0}:\n{1}"
+    IDS_ERR_CONFIG_SAVE     "{0} yapılandırma dosyasına yazılamadı:\n{1}"
+    IDS_ERR_CONFIG_SESSIONS "Başlatıcılar oturum açmış durumda. Yapılandırma açmadan önce bağlantılarını kesin."
+    IDS_ERR_CONFIG_TARGETS  "Şu hedefler açılamadı ve sunulmuyor:\n\n{0}"
+    IDS_CONFIRM_UNSTABLE    "Şu aygıtların kalıcı adı yok. Numara veya yol ile kaydedilecekler; yeniden başlatma sonrasında bu değerler başka bir aygıtı gösterebilir:\n\n{0}\nYine de kaydedilsin mi?"
+    IDS_ERR_CONFIG_UNKNOWN  "Bilinmeyen ayar: {0}"
+    IDS_ERR_CONFIG_VALUE    "{0} için geçersiz değer: {1}"
+    IDS_ERR_CONFIG_TARGET_NAME "Geçersiz iSCSI hedef adı: {0}"
+    IDS_ERR_CONFIG_SPTI_MIXED "Hedef {0}: spti, disklerle veya başka bir spti ile birlikte kullanılamaz."
+    IDS_ERR_CONFIG_NOT_IN_TARGET "{0}, bir [target <name>] bölümünde olmalıdır."
+    IDS_ERR_CONFIG_NOT_IN_SERVER "{0}, [server] bölümünde olmalıdır."
+    IDS_ERR_CONFIG_INVALID_LINE "Ayar veya bölüm değil: {0}"
+    IDS_ERR_CONFIG_UNKNOWN_SECTION "Bilinmeyen bölüm: {0}"
+    IDS_ERR_CONFIG_EMPTY_TARGET "{0} hedefinde disk yok."
+    IDS_ERR_CONFIG_LDM_UNUSED "ldm-disk yalnızca dinamik birimlerle kullanılabilir."
+    IDS_ERR_NO_SUCH_DEVICE  "{0} adlı aygıt yok. Bağlı olmayabilir."
+    IDS_ERR_AMBIGUOUS_DEVICE "{0} adında birden fazla aygıt var."
+    IDS_ERR_CONFIG_INITIATOR_NAME "Geçersiz iSCSI başlatıcı adı: {0}"
+    IDS_ERR_CONFIG_SECRET   "{0}, {1} ile {2} karakter uzunluğunda olmalıdır."
+    IDS_ERR_CONFIG_CHAP_INCOMPLETE "Hedef {0}: chap-user ve karşılıklı CHAP ayarları chap-secret gerektirir; mutual-chap-user ise mutual-chap-secret gerektirir."
+    IDS_ERR_CONFIG_CHAP_SAME_SECRET "Hedef {0}: mutual-chap-secret, chap-secret değerinden farklı olmalıdır."
+END

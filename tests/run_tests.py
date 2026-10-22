@@ -116,13 +116,16 @@ def test_cli_errors(ctx):
     result = subprocess.run([ctx.exe, "--help", "--lang=ja-JP"], capture_output=True, timeout=10)
     ctx.check(result.returncode == 0 and "使い方" in result.stdout.decode("utf-8", "replace"),
               "--lang=ja-JP prints Japanese usage (UTF-8 when redirected)")
-    for tag, word in (("zh-CN", "用法"), ("zh-TW", "說明"), ("ko-KR", "사용법")):
+    for tag, word in (("zh-CN", "用法"), ("zh-TW", "說明"), ("ko-KR", "사용법"), ("tr-TR", "Kullanım")):
         result = subprocess.run([ctx.exe, "--help", "--lang", tag], capture_output=True, timeout=10)
         ctx.check(result.returncode == 0 and word in result.stdout.decode("utf-8", "replace"),
                   f"--lang {tag} prints localized usage")
     result = subprocess.run([ctx.exe, "--lang", "zh-TW", "--ram", "12X"], capture_output=True, timeout=10)
     ctx.check(result.returncode == 1 and "大小無效" in result.stderr.decode("utf-8", "replace"),
               "errors are localized (zh-TW)")
+    result = subprocess.run([ctx.exe, "--lang", "tr-TR", "--ram", "12X"], capture_output=True, timeout=10)
+    ctx.check(result.returncode == 1 and "Geçersiz boyut" in result.stderr.decode("utf-8", "replace"),
+              "errors are localized (tr-TR)")
     rc, out = run("--bogus")
     ctx.check(rc == 1 and "Unknown option: --bogus" in out, "unknown option is rejected")
     rc, out = run("--ram", "12X")
@@ -2036,7 +2039,16 @@ def test_gui(ctx):
         status, _, _ = s.full_login(TARGET)
         ctx.check(status == 0, "target survives the language switch")
         s.logout()
-        gui.user32.PostMessageW(japanese, Gui.WM_CLOSE, 0, 0)
+        gui.command(japanese, Gui.IDM_LANG_FIRST + 5)  # View > Language > Türkçe
+        turkish = gui.top_window()
+        ctx.check(turkish is not None and "dinleniyor" in gui.status_text(turkish),
+                  "switching to Turkish rebuilds the window, server keeps running")
+        ctx.check(gui.text(gui.user32.GetDlgItem(turkish, Gui.IDC_START)) == "&Durdur",
+                  "Turkish dialog resources are loaded")
+        s = ctx.session()
+        ctx.check(s.full_login(TARGET)[0] == 0, "target survives the Turkish language switch")
+        s.logout()
+        gui.user32.PostMessageW(turkish, Gui.WM_CLOSE, 0, 0)
         try:
             gui.process.wait(timeout=10)
             ctx.check(gui.process.returncode == 0, "the window closes and the process exits")

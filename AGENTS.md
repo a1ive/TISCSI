@@ -16,7 +16,7 @@ by Tal Aloni (C#, LGPL-3.0-or-later) to the Win32 API and modern C++.
 - License GPL-3.0-or-later. Code translated from iSCSI Console or
   DiskAccessLibrary keeps Tal Aloni's copyright line and notes the LGPL origin
   in its header, below the SPDX line.
-- UI languages: en-US, ja-JP, zh-CN, zh-TW, ko-KR.
+- UI languages: en-US, ja-JP, zh-CN, zh-TW, ko-KR, tr-TR.
 - Reference sources live in `ref/` (git-ignored): `ref/iSCSIConsole` and
   `ref/DiskAccessLibrary` (the LDM code was ported from the latter). The VHD
   and VMDK code was written from the public format specifications instead.

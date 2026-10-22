@@ -56,7 +56,7 @@ VHD 만들기 (디스크도 지정한 경우에만 이어서 서버를 시작합
                        이 시간(초)만큼 기다립니다\n\
   --skip-unavailable   열 수 없는 대상이 있어도 다른 대상을 제공합니다\n\
                        (기본값: 아무것도 제공하지 않음)\n\
-  --lang <태그>        표시 언어: en-US, ja-JP, zh-CN, zh-TW 또는 ko-KR\n\
+  --lang <태그>        표시 언어: en-US, ja-JP, zh-CN, zh-TW, ko-KR 또는 tr-TR\n\
                        (기본값: Windows 표시 언어)\n\
   --help               이 도움말을 표시합니다\n\n"
     IDS_CLI_USAGE_MORE "액세스 제어 (현재 대상):\n\

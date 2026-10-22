@@ -78,6 +78,7 @@
   <ItemGroup>
     <None Include="lang\en-US.rc2" />
     <None Include="lang\ja-JP.rc2" />
+    <None Include="lang\tr-TR.rc2" />
     <None Include="packages.config" />
     <None Include="TISCSI.manifest" />
   </ItemGroup>

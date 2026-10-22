@@ -54,7 +54,7 @@ BEGIN
   --wait <秒數>        啟動時最多等待這麼久，直到尚不存在的磁碟、磁碟區、映像\n\
                        與 --listen 位址出現\n\
   --skip-unavailable   某個目標無法開啟時仍提供其他目標 (預設: 都不提供)\n\
-  --lang <標記>        介面語言: en-US、ja-JP、zh-CN、zh-TW 或 ko-KR\n\
+  --lang <標記>        介面語言: en-US、ja-JP、zh-CN、zh-TW、ko-KR 或 tr-TR\n\
                        (預設: Windows 顯示語言)\n\
   --help               顯示此說明\n\n"
     IDS_CLI_USAGE_MORE "存取控制 (針對目前的目標):\n\

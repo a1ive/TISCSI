@@ -178,7 +178,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "TISCSI"
     IDS_ABOUT_VERSION       "버전 {0}"
-    IDS_USAGE               "명령줄 옵션:\n\n/log\t프로그램 폴더에 로그 파일을 기록합니다\n--log=<파일>\t지정한 파일에 로그를 기록합니다\n--lang=<태그>\t표시 언어 (en-US, ja-JP, zh-CN, zh-TW, ko-KR)\n--config=<파일>\t구성 파일을 열고 서버를 시작합니다"
+    IDS_USAGE               "명령줄 옵션:\n\n/log\t프로그램 폴더에 로그 파일을 기록합니다\n--log=<파일>\t지정한 파일에 로그를 기록합니다\n--lang=<태그>\t표시 언어 (en-US, ja-JP, zh-CN, zh-TW, ko-KR, tr-TR)\n--config=<파일>\t구성 파일을 열고 서버를 시작합니다"
     IDS_ERR_LOG_FILE        "로그 파일 {0}을(를) 열 수 없습니다:\n{1}"
 
     IDS_ANY_ADDRESS         "모두"

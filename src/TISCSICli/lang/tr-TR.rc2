@@ -1,0 +1,206 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 A1ive
+//
+// Turkish (Türkiye). {0}, {1}, ... are std::format arguments.
+
+#pragma code_page(65001)
+
+LANGUAGE LANG_TURKISH, SUBLANG_TURKISH_TURKEY
+
+STRINGTABLE
+BEGIN
+    IDS_CLI_USAGE "Kullanım: TISCSICli [seçenekler] [--target <name>] <disk>... [--target <name> <disk>...]...\n\n\
+Disk görüntülerini ve RAM disklerini iSCSI başlatıcılarına sunar.\n\n\
+Diskler (her biri geçerli hedefin bir sonraki LUN'u olur):\n\
+  --image <path>       Okuma-yazma disk görüntüsü (.vhd, .vhdx, .avhdx, .vmdk; diğer uzantılar: ham)\n\
+                       .iso görüntüsü salt okunur CD/DVD-ROM sürücüsüdür\n\
+  --image-ro <path>    Salt okunur disk görüntüsü\n\
+  --cdrom <path>       Herhangi bir dosyayı salt okunur CD/DVD-ROM diski olarak sun\n\
+  --ram <size>         Yeni RAM diski, ör. 512M veya 2G\n\
+  --disk <disk>        Okuma-yazma fiziksel disk (birimleri kilitlenir): disk\n\
+                       numarası veya --list ile gösterilen, disk numarası\n\
+                       değişse de aynı kalan kalıcı ad\n\
+                       (serial:<seri numarası>, gpt:{<disk GUID>},\n\
+                       mbr:<disk imzası>)\n\
+  --disk-ro <disk>     Salt okunur fiziksel disk\n\
+  --volume <volume>    Okuma-yazma birim: E:, bağlama noktası,\n\
+                       \\\\?\\Volume{...}\\ veya --list ile gösterilen kalıcı ad\n\
+                       (gpt:{<bölüm GUID>}, mbr:<disk imzası>:<uzaklık>)\n\
+  --volume-ro <volume> Salt okunur birim\n\
+  --dynamic-volume <id>\n\
+                       Okuma-yazma dinamik birim (GUID, Volume1 gibi bir ad\n\
+                       veya E:); Windows'un bağlamadığı birimler de desteklenir\n\
+  --dynamic-volume-ro <id>\n\
+                       Salt okunur dinamik birim\n\
+  --ldm-disk <image>   Dinamik birimleri fiziksel diskler yerine bu üye disk\n\
+                       görüntüsünde ara (her üye için tekrarlayın)\n\n\
+Hedefler:\n\
+  --target <name>      Yeni hedef başlat; sonraki diskler bu hedefe aittir.\n\
+                       İlk --target öncesinde verilen diskler\n\
+                       iqn.1991-05.com.microsoft:target1 hedefine aittir\n\
+  --spti <device>      Hedefin SCSI komutlarını yerel bir aygıta aktar\n\
+                       (\\\\.\\CdRom0, \\\\.\\Tape0, \\\\.\\Scsi2:, ...)\n\
+                       veya serial:<seri numarası> kullan (bkz. --list)\n\
+  --list               Fiziksel diskleri, birimleri, dinamik birimleri ve SCSI\n\
+                       aygıtlarını listele (diskler, birimler ve --spti yönetici\n\
+                       hakları gerektirir; --ldm-disk kaynaklı birimler hariç)\n\n\
+VHD oluşturma (sonrasında sunucu yalnızca disk verilmişse başlar):\n\
+  --create-vhd <path>  Yeni VHD dosyası oluştur\n\
+  --size <size>        Yeni VHD boyutu, ör. 20G (en fazla 2040G)\n\
+  --dynamic            Dinamik olarak genişleyen VHD (varsayılan: sabit boyut)\n\n\
+Sunucu:\n\
+  --listen <address>   Dinlenecek IPv4 adresi (varsayılan: tüm arabirimler)\n\
+  --port <port>        TCP bağlantı noktası (varsayılan: 3260)\n\
+  --log <file>         Günlüğü ayrıca bir dosyaya yaz\n\
+  --verbosity <level>  error, warning, info (varsayılan), verbose veya debug\n\
+  --wait <seconds>     Başlangıçta henüz hazır olmayan diskleri, birimleri,\n\
+                       görüntüleri ve --listen adresini bu süre boyunca bekle\n\
+  --skip-unavailable   Bir hedef açılamazsa diğerlerini sun\n\
+                       (varsayılan: hiçbirini sunma)\n\
+  --lang <tag>         Dil: en-US, ja-JP, zh-CN, zh-TW, ko-KR veya tr-TR\n\
+                       (varsayılan: Windows dili)\n\
+  --help               Bu yardımı göster\n\n"
+    IDS_CLI_USAGE_MORE "Erişim denetimi (geçerli hedef için):\n\
+  --allow-initiator <name>\n\
+                       Yalnızca bu başlatıcı oturum açabilir (çoğaltılabilir);\n\
+                       diğerleri keşif sırasında hedefi göremez\n\
+  --chap-secret <secret>\n\
+                       Bu parolayla CHAP zorunlu olsun (12 ile 255 karakter)\n\
+  --chap-user <name>   Başlatıcının CHAP adı (varsayılan: herhangi bir ad)\n\
+  --mutual-chap-secret <secret>\n\
+                       Başlatıcının karşılıklı CHAP sınamasına yanıt parolası\n\
+                       (--chap-secret değerinden farklı olmalıdır)\n\
+  --mutual-chap-user <name>\n\
+                       Hedefin CHAP adı (varsayılan: hedef adı)\n\
+                       Komut satırındaki parolalar diğer programlar tarafından\n\
+                       görülebilir; yapılandırma dosyası kullanın\n\n\
+Yapılandırma dosyaları:\n\
+  --config <file>      Sunucu seçeneklerini, hedefleri ve diskleri dosyadan oku;\n\
+                       ayrıca verilen sunucu seçenekleri dosyadakileri geçersiz kılar\n\
+  --save-config <file> Sunmak yerine hedefleri ve seçenekleri dosyaya yaz;\n\
+                       aygıtlar kalıcı adlarıyla kaydedilir\n\n\
+Windows hizmeti (yönetici hakları gerektirir):\n\
+  --install-service    --config dosyasını Windows başlangıcından itibaren,\n\
+                       oturum açılmadan sunan hizmeti yükle ve başlat. Güncellemek\n\
+                       için tekrar çalıştırın. Günlük, dosyanın günlük ayarına\n\
+                       veya yapılandırma yanındaki TISCSI-service.log dosyasına yazılır\n\
+  --uninstall-service  Hizmeti durdur ve kaldır\n\
+  --service-name <name>\n\
+                       Hizmet adı (varsayılan: TISCSI)\n\n\
+Örnek:\n\
+  TISCSICli --target iqn.2026-10.example:disk1 --image D:\\disk.vhd --ram 1G\n\
+  TISCSICli --create-vhd D:\\new.vhd --size 20G --dynamic --image D:\\new.vhd\n\
+  TISCSICli --config D:\\tiscsi\\server.conf --wait 60\n\
+  TISCSICli --install-service --config D:\\tiscsi\\server.conf\n"
+    IDS_CLI_LISTENING "{0}:{1} dinleniyor"
+    IDS_CLI_TARGET "Hedef: {0}"
+    IDS_CLI_LUN "  LUN {0}: {1}, {2}{3}"
+    IDS_CLI_READ_ONLY " (salt okunur)"
+    IDS_CLI_RAM_DISK "RAM diski"
+    IDS_CLI_PRESS_CTRL_C "Sunucuyu durdurmak için Ctrl+C tuşlarına basın."
+    IDS_CLI_STOPPING "Sunucu durduruluyor..."
+    IDS_CLI_STOPPED "Sunucu durduruldu."
+    IDS_CLI_CREATING "{0} oluşturuluyor ({1}, {2})..."
+    IDS_CLI_CREATED "{0} oluşturuldu."
+    IDS_CLI_VHD_FIXED "sabit boyutlu"
+    IDS_CLI_VHD_DYNAMIC "dinamik olarak genişleyen"
+    IDS_CLI_PHYSICAL_DISK "Fiziksel disk {0}"
+    IDS_CLI_VOLUME "Birim {0}"
+    IDS_CLI_SPTI "  {0} aygıtına SCSI geçişi ({1} LUN)"
+    IDS_CLI_HINT_ADMIN "Fiziksel diskler, birimler ve SCSI geçişi için yönetici olarak çalıştırmanız gerekir."
+    IDS_CLI_LIST_DISKS "Fiziksel diskler:"
+    IDS_CLI_LIST_DISK "  {0}: {1}, {2}{3}"
+    IDS_CLI_LIST_DYNAMIC " (dinamik disk)"
+    IDS_CLI_LIST_VOLUMES "Birimler:"
+    IDS_CLI_LIST_VOLUME "  {0}\n    bağlama noktası: {1}; dosya sistemi: {2}; etiket: {3}; boyut: {4}; disk: {5}"
+    IDS_CLI_LIST_SCSI "SCSI aygıtları:"
+    IDS_CLI_LIST_DYNAMIC_VOLUMES "Dinamik birimler:"
+    IDS_CLI_LIST_DYNAMIC_VOLUME "  {0}  {1}\n    disk grubu: {2}; düzen: {3}; durum: {4}; boyut: {5}; disk: {6}\n    {7}"
+    IDS_CLI_LIST_WINDOWS_VOLUME "Windows birimi: {0}"
+    IDS_CLI_LIST_NOT_MOUNTED "Windows tarafından bağlanmamış; üye disklerden sunuluyor"
+    IDS_CLI_DYNAMIC_VOLUME "Dinamik birim {0}"
+    IDS_CLI_LIST_STABLE_NAMES "    kalıcı adlar: {0}"
+    IDS_CLI_WAITING "{0} hedefinin diskleri için en fazla {1} sn bekleniyor..."
+    IDS_CLI_WAITING_ADDRESS "{0} adresi için en fazla {1} sn bekleniyor..."
+    IDS_CLI_TARGET_SKIPPED "{0} hedefi sunulmuyor."
+    IDS_CLI_CONFIG_SAVED "Yapılandırma {0} dosyasına kaydedildi."
+    IDS_CLI_WARN_UNSTABLE "Uyarı: {0} için kalıcı ad yok. Verildiği biçimde kaydedilecek; yeniden başlatma sonrasında başka bir aygıtı gösterebilir."
+    IDS_CLI_SERVICE_DESCRIPTION "{0} dosyasında yapılandırıldığı şekilde diskleri ve disk görüntülerini iSCSI üzerinden sunar."
+    IDS_CLI_SERVICE_INSTALLED "{0} hizmeti yüklendi. Windows ile başlar ve {1} dosyasını sunar."
+    IDS_CLI_SERVICE_UPDATED "{0} hizmeti güncellendi. {1} dosyasını sunar."
+    IDS_CLI_SERVICE_RUNNING "Hizmet çalışıyor. Günlük dosyası: {0}."
+    IDS_CLI_SERVICE_REMOVED "{0} hizmeti kaldırıldı."
+    IDS_CLI_WARN_NO_WAIT "Uyarı: yapılandırmada wait ayarı yok. Windows başlatıldığında diskler henüz hazır olmayabilir; [server] bölümünde wait = 60 kullanmayı düşünün."
+    IDS_CLI_HINT_ADMIN_SERVICE "Hizmeti yüklemek ve kaldırmak için yönetici olarak çalıştırmanız gerekir."
+    IDS_CLI_ACCESS_INITIATORS "  İzin verilen başlatıcılar: {0}"
+    IDS_CLI_ACCESS_CHAP "  CHAP kimlik doğrulaması gerekli"
+    IDS_CLI_ACCESS_MUTUAL_CHAP "  CHAP kimlik doğrulaması gerekli; karşılıklı CHAP kullanılabilir"
+    IDS_CLI_LAYOUT_SIMPLE "basit"
+    IDS_CLI_LAYOUT_SPANNED "dağıtılmış"
+    IDS_CLI_LAYOUT_STRIPED "şeritli"
+    IDS_CLI_LAYOUT_MIRRORED "yansıtılmış"
+    IDS_CLI_LAYOUT_RAID5 "RAID-5"
+    IDS_CLI_HEALTH_HEALTHY "sağlam"
+    IDS_CLI_HEALTH_FAILED_REDUNDANCY "yedeklilik başarısız"
+    IDS_CLI_HEALTH_FAILED "başarısız"
+
+    IDS_CLI_ERR_UNKNOWN_OPTION "Bilinmeyen seçenek: {0}"
+    IDS_CLI_ERR_MISSING_VALUE "{0} seçeneği bir değer gerektirir."
+    IDS_CLI_ERR_INVALID_SIZE "Geçersiz boyut: {0}"
+    IDS_CLI_ERR_INVALID_PORT "Geçersiz bağlantı noktası: {0}"
+    IDS_CLI_ERR_INVALID_ADDRESS "Geçersiz IPv4 adresi: {0}"
+    IDS_CLI_ERR_INVALID_LEVEL "Geçersiz günlük ayrıntı düzeyi: {0}"
+    IDS_CLI_ERR_INVALID_TARGET_NAME "Geçersiz iSCSI hedef adı: {0}"
+    IDS_CLI_ERR_DUPLICATE_TARGET "Hedef adı birden fazla kez kullanılmış: {0}"
+    IDS_CLI_ERR_NO_DISKS "Disk belirtilmedi. --image, --image-ro veya --ram kullanın."
+    IDS_CLI_ERR_TARGET_WITHOUT_DISKS "{0} hedefinde disk yok."
+    IDS_CLI_ERR_OPEN_IMAGE "{0} disk görüntüsü açılamadı: {1}"
+    IDS_CLI_ERR_RAM_ALLOC "{0} boyutunda RAM diski ayrılamadı."
+    IDS_CLI_ERR_LOG_FILE "{0} günlük dosyası açılamadı: {1}"
+    IDS_CLI_ERR_START "Sunucu başlatılamadı: {0}"
+    IDS_CLI_ERR_HINT_HELP "Kullanım bilgisi için TISCSICli --help komutunu çalıştırın."
+    IDS_CLI_ERR_VHD_SIZE "Geçersiz VHD boyutu: {0} (512 baytın katı ve en fazla 2040 GiB olmalıdır)"
+    IDS_CLI_ERR_CREATE_NEEDS_SIZE "--create-vhd, --size gerektirir."
+    IDS_CLI_ERR_SIZE_WITHOUT_CREATE "--size ve --dynamic yalnızca --create-vhd ile kullanılabilir."
+    IDS_CLI_ERR_CREATE "{0} oluşturulamadı: {1}"
+    IDS_CLI_ERR_INVALID_DISK "Geçersiz disk: {0} (disk numarası veya kalıcı ad; bkz. --list)"
+    IDS_CLI_ERR_SPTI_MIXED "Hedef {0}: --spti, disklerle veya başka bir --spti ile birlikte kullanılamaz."
+    IDS_CLI_ERR_OPEN_SPTI "{0} SCSI aygıtı açılamadı: {1}"
+    IDS_CLI_ERR_DYNAMIC_DISK "{0} bir dinamik disktir. Başlatıcıdan bu diske yazmak dinamik disk veritabanını bozabilir; diski salt okunur olarak sunun (--disk-ro)."
+    IDS_CLI_ERR_VOLUME_LOCKED "{0} birimi özel erişim için kilitlenemedi ({1}). Birimi kullanan programları kapatın veya birimi salt okunur olarak sunun."
+    IDS_CLI_ERR_ALREADY_SERVED "{0} zaten sunuluyor."
+    IDS_CLI_ERR_WRITE_PROTECTED "{0} yazmaya karşı korumalı; salt okunur olarak sunun."
+    IDS_CLI_ERR_OPEN_DEVICE """{0}"" açılamadı: {1}"
+    IDS_CLI_ERR_NO_SUCH_VOLUME """{0}"" ile eşleşen dinamik birim yok (bkz. --list)."
+    IDS_CLI_ERR_AMBIGUOUS_VOLUME """{0}"" adında birden fazla dinamik birim var; GUID kullanın (bkz. --list)."
+    IDS_CLI_ERR_VOLUME_FAILED """{0}"" dinamik birimi kullanılamıyor: verilerini içeren diskler eksik."
+    IDS_CLI_ERR_DEGRADED_WRITE """{0}"" dinamik biriminin bir üye diski eksik. Birime yazmak üyeleri tutarsız bırakır; birimi salt okunur olarak sunun (--dynamic-volume-ro)."
+    IDS_CLI_ERR_LDM_UNUSED "--ldm-disk yalnızca --dynamic-volume, --dynamic-volume-ro veya --list ile kullanılabilir."
+    IDS_CLI_ERR_INVALID_DEVICE_NAME "Geçersiz aygıt adı: {0} (bkz. --list)"
+    IDS_CLI_ERR_NO_SUCH_DEVICE """{0}"" adlı aygıt yok (bkz. --list)."
+    IDS_CLI_ERR_AMBIGUOUS_DEVICE """{0}"" adında birden fazla aygıt var; aygıtın başka bir adını kullanın (bkz. --list)."
+    IDS_CLI_ERR_CONFIG_READ "{0} yapılandırma dosyası okunamadı: {1}"
+    IDS_CLI_ERR_CONFIG_LINE "{0}, satır {1}: {2}"
+    IDS_CLI_ERR_CONFIG_FILE "{0}: {1}"
+    IDS_CLI_ERR_CONFIG_MIXED "--config, --target veya disk seçenekleriyle birlikte kullanılamaz; hedefleri yapılandırma dosyasına koyun."
+    IDS_CLI_ERR_CONFIG_SAVE "{0} yapılandırma dosyasına yazılamadı: {1}"
+    IDS_CLI_ERR_CONFIG_NOT_IN_TARGET "{0}, bir [target <name>] bölümünde olmalıdır."
+    IDS_CLI_ERR_CONFIG_NOT_IN_SERVER "{0}, [server] bölümünde olmalıdır."
+    IDS_CLI_ERR_CONFIG_INVALID_LINE "Ayar veya bölüm değil: {0}"
+    IDS_CLI_ERR_CONFIG_UNKNOWN_SECTION "Bilinmeyen bölüm: {0}"
+    IDS_CLI_ERR_INVALID_WAIT "Geçersiz bekleme süresi: {0} (saniye, en fazla {1})"
+    IDS_CLI_ERR_INVALID_SWITCH "{0} için geçersiz değer: {1} (yes veya no kullanın)"
+    IDS_CLI_ERR_NOTHING_TO_SERVE "Hedeflerin hiçbiri sunulamıyor."
+    IDS_CLI_ERR_SERVICE_NEEDS_CONFIG "--install-service ve --service, --config <file> gerektirir."
+    IDS_CLI_ERR_SERVICE_OPTIONS "--install-service yalnızca --config ve --service-name kabul eder; diğer seçenekleri yapılandırma dosyasına koyun."
+    IDS_CLI_ERR_INVALID_SERVICE_NAME "Geçersiz hizmet adı: {0}"
+    IDS_CLI_ERR_SERVICE_INSTALL "{0} hizmeti yüklenemedi: {1}"
+    IDS_CLI_ERR_SERVICE_REMOVE "{0} hizmeti kaldırılamadı: {1}"
+    IDS_CLI_ERR_SERVICE_START "{0} hizmeti başlatılamadı: {1}"
+    IDS_CLI_ERR_SERVICE_STOPPED "{0} hizmeti durdu (çıkış kodu {1}). Günlüğe bakın: {2}"
+    IDS_CLI_ERR_NOT_SERVICE "--service, Windows hizmet denetleyicisi içindir. Hizmeti --install-service ile yükleyin."
+    IDS_CLI_ERR_INVALID_INITIATOR_NAME "Geçersiz iSCSI başlatıcı adı: {0}"
+    IDS_CLI_ERR_INVALID_SECRET "{0}, {1} ile {2} karakter uzunluğunda olmalıdır."
+    IDS_CLI_ERR_CHAP_INCOMPLETE "Hedef {0}: chap-user ve karşılıklı CHAP ayarları chap-secret gerektirir; mutual-chap-user ise mutual-chap-secret gerektirir."
+    IDS_CLI_ERR_CHAP_SAME_SECRET "Hedef {0}: mutual-chap-secret, chap-secret değerinden farklı olmalıdır."
+END

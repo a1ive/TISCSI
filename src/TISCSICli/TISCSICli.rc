@@ -49,3 +49,4 @@ END
 #include "lang/zh-CN.rc2"
 #include "lang/zh-TW.rc2"
 #include "lang/ko-KR.rc2"
+#include "lang/tr-TR.rc2"

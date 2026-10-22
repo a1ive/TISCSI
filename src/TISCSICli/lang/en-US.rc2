@@ -58,8 +58,8 @@ Server:\n\
                        and the --listen address that are not there yet\n\
   --skip-unavailable   Serve the other targets when one cannot be opened\n\
                        (default: serve none)\n\
-  --lang <tag>         Language: en-US, ja-JP, zh-CN, zh-TW\n\
-                       or ko-KR (default: Windows language)\n\
+  --lang <tag>         Language: en-US, ja-JP, zh-CN, zh-TW,\n\
+                       ko-KR or tr-TR (default: Windows language)\n\
   --help               Show this help\n\n"
     IDS_CLI_USAGE_MORE "Access control (for the current target):\n\
   --allow-initiator <name>\n\

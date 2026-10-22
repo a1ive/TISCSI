@@ -54,7 +54,7 @@ BEGIN
   --wait <秒数>        启动时最多等待这么久，直到尚不存在的磁盘、卷、映像\n\
                        和 --listen 地址出现\n\
   --skip-unavailable   某个目标无法打开时仍提供其他目标 (默认: 都不提供)\n\
-  --lang <标记>        界面语言: en-US、ja-JP、zh-CN、zh-TW 或 ko-KR\n\
+  --lang <标记>        界面语言: en-US、ja-JP、zh-CN、zh-TW、ko-KR 或 tr-TR\n\
                        (默认: Windows 显示语言)\n\
   --help               显示此帮助\n\n"
     IDS_CLI_USAGE_MORE "访问控制 (针对当前目标):\n\

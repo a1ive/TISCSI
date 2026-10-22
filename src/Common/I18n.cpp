@@ -18,6 +18,7 @@ constexpr std::array kLanguages{
     Language{MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED), L"zh-CN", L"简体中文"},
     Language{MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL), L"zh-TW", L"正體中文"},
     Language{MAKELANGID(LANG_KOREAN, SUBLANG_KOREAN), L"ko-KR", L"한국어"},
+    Language{MAKELANGID(LANG_TURKISH, SUBLANG_TURKISH_TURKEY), L"tr-TR", L"Türkçe"},
 };
 
 HMODULE g_module = nullptr;

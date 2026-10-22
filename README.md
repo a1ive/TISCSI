@@ -6,8 +6,8 @@ written with the Win32 API and modern C++. It is a port of
 
 - Native, portable executable: no .NET, no installer
 - Runs on Windows XP and later (x86 / x64)
-- User interface in English, Japanese, Simplified Chinese, Traditional Chinese
-  and Korean
+- User interface in English, Japanese, Simplified Chinese, Traditional Chinese,
+  Korean and Turkish
 
 > **Status:** early development. Notes for contributors, including open items,
 > are in [AGENTS.md](AGENTS.md).
@@ -234,7 +234,7 @@ firewall for other computers to connect. In Windows PE, start
 The UI follows the Windows display language. To override it, choose
 **View > Language**, set `Language=` under `[UI]` in `TISCSI.ini` next to the
 executable, or start with `--lang=<tag>` (both programs): `en-US`, `ja-JP`,
-`zh-CN`, `zh-TW` or `ko-KR`.
+`zh-CN`, `zh-TW`, `ko-KR` or `tr-TR`.
 
 ## License
 

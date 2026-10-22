@@ -178,7 +178,7 @@ STRINGTABLE
 BEGIN
     IDS_APP_TITLE           "TISCSI"
     IDS_ABOUT_VERSION       "版本 {0}"
-    IDS_USAGE               "命令列選項:\n\n/log\t在程式所在資料夾寫入記錄檔\n--log=<檔案>\t將記錄寫入指定的檔案\n--lang=<標記>\t介面語言 (en-US、ja-JP、zh-CN、zh-TW、ko-KR)\n--config=<檔案>\t開啟設定檔並啟動伺服器"
+    IDS_USAGE               "命令列選項:\n\n/log\t在程式所在資料夾寫入記錄檔\n--log=<檔案>\t將記錄寫入指定的檔案\n--lang=<標記>\t介面語言 (en-US、ja-JP、zh-CN、zh-TW、ko-KR、tr-TR)\n--config=<檔案>\t開啟設定檔並啟動伺服器"
     IDS_ERR_LOG_FILE        "無法開啟記錄檔 {0}:\n{1}"
 
     IDS_ANY_ADDRESS         "任何"
