@@ -41,7 +41,7 @@ XP-era DLLs plus `msvcrt.dll` and have subsystem version 5.01 (x86) / 5.02
 (x64): `dumpbin -imports` / `dumpbin -headers`. Current import sets:
 
 - CLI: KERNEL32, ADVAPI32, ole32, WS2_32, msvcrt
-- GUI: the above plus COMCTL32, COMDLG32, USER32, SHELL32
+- GUI: the above plus COMCTL32, COMDLG32, USER32, SHELL32, IPHLPAPI
 
 ## Test
 
@@ -228,6 +228,11 @@ These are deliberate. Don't "fix" them back to the original behavior.
   does not use but saves again. Access settings are set when a target is
   added (`AccessDialog`, checked like `config::Validate`). Existing targets
   keep theirs: login threads read `IscsiTarget::access` without a lock.
+- GUI address list: Any, physical adapters, other adapters, 127.0.0.1. The
+  addresses come from host name resolution, which skips disconnected adapters.
+  An adapter is physical if its network class registry entry has
+  `NCF_PHYSICAL`, so an address on a Hyper-V external switch's vEthernet
+  counts as virtual although it reaches the LAN.
 - Startup (CLI): a target opens with all its disks or not at all, so LUN
   numbers never shift. `--wait` retries failures that may go away
   (`MayAppearLater`: missing device, volume or file) once a second, and a

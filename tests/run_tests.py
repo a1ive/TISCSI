@@ -1921,8 +1921,9 @@ def test_gui(ctx):
     try:
         main = gui.top_window()
         ctx.check(main is not None and gui.text(main) == "TISCSI", "main window opens")
-        ctx.check(gui.combo_items(main, Gui.IDC_ADDRESS).count("127.0.0.1") == 1,
-                  "address list offers 127.0.0.1 once")
+        addresses = gui.combo_items(main, Gui.IDC_ADDRESS)
+        ctx.check(addresses[0] == "Any" and addresses[-1] == "127.0.0.1" and addresses.count("127.0.0.1") == 1,
+                  "address list starts with Any and ends with 127.0.0.1, once")
         gui.set_text(main, Gui.IDC_PORT, str(ctx.port))
         gui.command(main, Gui.IDC_ADD_TARGET)
         add = gui.top_window()

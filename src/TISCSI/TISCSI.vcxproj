@@ -46,7 +46,7 @@
       <SubSystem>Windows</SubSystem>
       <!-- The manifest is embedded by TISCSI.rc so XP gets an asm.v2 trustInfo block. -->
       <GenerateManifest>false</GenerateManifest>
-      <AdditionalDependencies>comctl32.lib;comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>comctl32.lib;comdlg32.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

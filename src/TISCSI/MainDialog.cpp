@@ -16,10 +16,12 @@
 
 #include <winsock2.h>
 #include <commctrl.h>
+#include <iphlpapi.h>
 
 #include <algorithm>
 #include <cstring>
 #include <format>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -43,22 +45,98 @@ HMENU FindSubMenuContaining(HMENU menu, UINT id)
     return nullptr;
 }
 
-// IPv4 addresses of this host (gethostbyname works on every Windows version).
+// Whether the network class entry of an adapter says it is hardware. Anything
+// not found counts as virtual. Readable without administrator rights.
+bool IsPhysicalAdapter(const char* adapterGuid)
+{
+    constexpr DWORD kNcfPhysical = 0x4; // netcfgx.h
+    HKEY adapters = nullptr;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
+                      "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}", 0, KEY_READ,
+                      &adapters) != ERROR_SUCCESS) {
+        return false;
+    }
+    bool physical = false;
+    char subkey[64];
+    DWORD subkeySize = sizeof(subkey);
+    for (DWORD i = 0; RegEnumKeyExA(adapters, i, subkey, &subkeySize, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS;
+         ++i, subkeySize = sizeof(subkey)) {
+        HKEY adapter = nullptr;
+        if (RegOpenKeyExA(adapters, subkey, 0, KEY_READ, &adapter) != ERROR_SUCCESS) {
+            continue; // "Properties" is not readable
+        }
+        char id[64] = {};
+        DWORD idSize = sizeof(id) - 1;
+        DWORD characteristics = 0;
+        DWORD characteristicsSize = sizeof(characteristics);
+        const bool found =
+            RegQueryValueExA(adapter, "NetCfgInstanceId", nullptr, nullptr, reinterpret_cast<BYTE*>(id), &idSize) == ERROR_SUCCESS &&
+            _stricmp(id, adapterGuid) == 0;
+        if (found) {
+            physical = RegQueryValueExA(adapter, "Characteristics", nullptr, nullptr, reinterpret_cast<BYTE*>(&characteristics),
+                                        &characteristicsSize) == ERROR_SUCCESS &&
+                       (characteristics & kNcfPhysical) != 0;
+        }
+        RegCloseKey(adapter);
+        if (found) {
+            break;
+        }
+    }
+    RegCloseKey(adapters);
+    return physical;
+}
+
+std::vector<std::string> PhysicalAdapterAddresses()
+{
+    std::vector<std::string> result;
+    ULONG size = 0;
+    if (GetAdaptersInfo(nullptr, &size) != ERROR_BUFFER_OVERFLOW) {
+        return result;
+    }
+    std::vector<char> buffer(size);
+    auto* adapters = reinterpret_cast<IP_ADAPTER_INFO*>(buffer.data());
+    if (GetAdaptersInfo(adapters, &size) != NO_ERROR) {
+        return result;
+    }
+    for (const IP_ADAPTER_INFO* adapter = adapters; adapter; adapter = adapter->Next) {
+        if (IsPhysicalAdapter(adapter->AdapterName)) {
+            for (const IP_ADDR_STRING* ip = &adapter->IpAddressList; ip; ip = ip->Next) {
+                result.emplace_back(ip->IpAddress.String);
+            }
+        }
+    }
+    return result;
+}
+
+// IPv4 addresses of this host (gethostbyname works on every Windows version):
+// those of physical adapters, then the others, then the loopback address.
+// Host name resolution leaves that out while a network is up and may return it
+// while none is, so it is always added here.
 std::vector<std::wstring> LocalAddresses()
 {
-    std::vector<std::wstring> result;
+    constexpr const char* kLoopback = "127.0.0.1";
+    std::vector<std::string> addresses;
     char name[256] = {};
-    if (gethostname(name, sizeof(name)) != 0) {
-        return result;
+    const hostent* host = gethostname(name, sizeof(name)) == 0 ? gethostbyname(name) : nullptr;
+    if (host && host->h_addrtype == AF_INET) {
+        for (char** address = host->h_addr_list; *address; ++address) {
+            in_addr in;
+            std::memcpy(&in, *address, sizeof(in));
+            std::string dotted = inet_ntoa(in);
+            if (dotted != kLoopback) {
+                addresses.push_back(std::move(dotted));
+            }
+        }
     }
-    const hostent* host = gethostbyname(name);
-    if (!host || host->h_addrtype != AF_INET) {
-        return result;
-    }
-    for (char** address = host->h_addr_list; *address; ++address) {
-        in_addr in;
-        std::memcpy(&in, *address, sizeof(in));
-        result.push_back(text::Utf8ToWide(inet_ntoa(in)));
+    const std::vector<std::string> physical = PhysicalAdapterAddresses();
+    std::stable_partition(addresses.begin(), addresses.end(), [&](const std::string& address) {
+        return std::find(physical.begin(), physical.end(), address) != physical.end();
+    });
+    addresses.emplace_back(kLoopback);
+
+    std::vector<std::wstring> result;
+    for (const std::string& address : addresses) {
+        result.push_back(text::Utf8ToWide(address));
     }
     return result;
 }
@@ -219,12 +297,6 @@ void MainDialog::FillAddresses()
     SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(i18n::Str(IDS_ANY_ADDRESS).c_str()));
     for (const std::wstring& address : LocalAddresses()) {
         SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(address.c_str()));
-    }
-    // Host name resolution leaves out the loopback address while a network is
-    // up (and may return it while none is), so add it only when missing.
-    const wchar_t* const loopback = L"127.0.0.1";
-    if (SendMessageW(combo, CB_FINDSTRINGEXACT, static_cast<WPARAM>(-1), reinterpret_cast<LPARAM>(loopback)) == CB_ERR) {
-        SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(loopback));
     }
     // Keep the previous choice across dialog recreation. An address from a
     // configuration file may not be on this computer (yet): add it.
