@@ -1802,7 +1802,7 @@ class Gui:
 
     WM_SETTEXT, WM_GETTEXT, WM_GETTEXTLENGTH, WM_COMMAND, WM_CLOSE = 0x000C, 0x000D, 0x000E, 0x0111, 0x0010
     # Control and command IDs from src/TISCSI/resource.h
-    IDOK, IDC_PORT, IDC_START, IDC_ADD_TARGET = 1, 1011, 1012, 1014
+    IDOK, IDC_ADDRESS, IDC_PORT, IDC_START, IDC_ADD_TARGET = 1, 1010, 1011, 1012, 1014
     IDC_TARGET_NAME, IDC_CREATE_RAMDISK, IDC_SIZE_MB, IDM_LANG_FIRST = 1020, 1023, 1033, 40101
     IDC_ADD_IMAGE, IDC_PATH, IDC_READ_ONLY, IDC_OPTICAL = 1024, 1030, 1032, 1038
     IDCANCEL, IDM_FILE_OPEN_CONFIG, IDM_FILE_SAVE_CONFIG = 2, 40003, 40004
@@ -1811,6 +1811,7 @@ class Gui:
     IDC_CREATE_VHD, IDC_DYNAMIC, IDC_DIFFERENCING, IDC_PARENT = 1022, 1035, 1039, 1045
     IDC_STATIC_TEXT = 0xFFFF  # message box text
     BM_GETCHECK, BM_CLICK = 0x00F0, 0x00F5
+    CB_GETCOUNT, CB_GETLBTEXTLEN, CB_GETLBTEXT = 0x0146, 0x0149, 0x0148
 
     def __init__(self, exe, args):
         import ctypes
@@ -1865,6 +1866,16 @@ class Gui:
         hwnd = self.user32.GetDlgItem(dialog, control)
         return self.user32.SendMessageW(hwnd, self.BM_GETCHECK, 0, 0) == 1, bool(self.user32.IsWindowEnabled(hwnd))
 
+    def combo_items(self, dialog, control):
+        hwnd = self.user32.GetDlgItem(dialog, control)
+        items = []
+        for index in range(self.user32.SendMessageW(hwnd, self.CB_GETCOUNT, 0, 0)):
+            length = self.user32.SendMessageW(hwnd, self.CB_GETLBTEXTLEN, index, 0)
+            buffer = self.ctypes.create_unicode_buffer(length + 1)
+            self.user32.SendMessageW(hwnd, self.CB_GETLBTEXT, index, self.ctypes.addressof(buffer))
+            items.append(buffer.value)
+        return items
+
     def command(self, window, command_id):
         self.user32.PostMessageW(window, self.WM_COMMAND, command_id, 0)
 
@@ -1910,6 +1921,8 @@ def test_gui(ctx):
     try:
         main = gui.top_window()
         ctx.check(main is not None and gui.text(main) == "TISCSI", "main window opens")
+        ctx.check(gui.combo_items(main, Gui.IDC_ADDRESS).count("127.0.0.1") == 1,
+                  "address list offers 127.0.0.1 once")
         gui.set_text(main, Gui.IDC_PORT, str(ctx.port))
         gui.command(main, Gui.IDC_ADD_TARGET)
         add = gui.top_window()

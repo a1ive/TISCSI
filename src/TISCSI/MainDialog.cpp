@@ -220,6 +220,12 @@ void MainDialog::FillAddresses()
     for (const std::wstring& address : LocalAddresses()) {
         SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(address.c_str()));
     }
+    // Host name resolution leaves out the loopback address while a network is
+    // up (and may return it while none is), so add it only when missing.
+    const wchar_t* const loopback = L"127.0.0.1";
+    if (SendMessageW(combo, CB_FINDSTRINGEXACT, static_cast<WPARAM>(-1), reinterpret_cast<LPARAM>(loopback)) == CB_ERR) {
+        SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(loopback));
+    }
     // Keep the previous choice across dialog recreation. An address from a
     // configuration file may not be on this computer (yet): add it.
     int index = 0;
