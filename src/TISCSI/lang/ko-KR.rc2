@@ -107,7 +107,7 @@ BEGIN
     PUSHBUTTON      "취소", IDCANCEL, 203, 58, 50, 14
 END
 
-IDD_CREATE_VHD DIALOGEX 0, 0, 260, 96
+IDD_CREATE_VHD DIALOGEX 0, 0, 260, 127
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "가상 디스크 만들기"
 FONT 9, "Malgun Gothic", 0, 0, 0x81
@@ -120,9 +120,13 @@ BEGIN
     CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 118, 26, 10, 13
     LTEXT           "MB", IDC_STATIC, 123, 28, 20, 9
     AUTOCHECKBOX    "동적 확장(&D)", IDC_DYNAMIC, 58, 45, 160, 10
-    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 61, 246, 9
-    DEFPUSHBUTTON   "확인", IDOK, 146, 76, 50, 14
-    PUSHBUTTON      "취소", IDCANCEL, 203, 76, 50, 14
+    AUTOCHECKBOX    "부모 디스크의 차이점 보관용 이미지(&I)", IDC_DIFFERENCING, 58, 59, 180, 10
+    LTEXT           "부모(&P):", IDC_STATIC, 7, 74, 50, 9
+    EDITTEXT        IDC_PARENT, 58, 72, 140, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "찾아보기(&W)...", IDC_BROWSE_PARENT, 203, 71, 50, 15
+    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 92, 246, 9
+    DEFPUSHBUTTON   "확인", IDOK, 146, 107, 50, 14
+    PUSHBUTTON      "취소", IDCANCEL, 203, 107, 50, 14
 END
 
 IDD_CREATE_RAMDISK DIALOGEX 0, 0, 190, 50
@@ -207,6 +211,11 @@ BEGIN
     IDS_ERR_NO_DISKS        "대상에 디스크를 하나 이상 추가하십시오."
     IDS_FILTER_IMAGES       "디스크 이미지 (*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso)|*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso|모든 파일 (*.*)|*.*|"
     IDS_FILTER_VHD          "가상 하드 디스크 (*.vhd)|*.vhd|"
+    IDS_FILTER_VIRTUAL_DISKS "가상 디스크 (*.vhd;*.vhdx;*.avhdx;*.vmdk)|*.vhd;*.vhdx;*.avhdx;*.vmdk|"
+    IDS_FILTER_DIFFERENCING "차이점 보관용 이미지 (*{0})|*{0}|"
+    IDS_ERR_NO_PARENT       "부모 가상 디스크를 선택하십시오."
+    IDS_ERR_PARENT_FORMAT   "부모는 VHD, VHDX 또는 VMDK 파일이어야 합니다."
+    IDS_ERR_CHILD_FORMAT    "차이점 보관용 이미지는 부모와 형식이 같습니다. 파일 이름은 {0}(으)로 끝나야 합니다."
     IDS_ERR_NO_FILE         "파일을 선택하십시오."
     IDS_ERR_OPEN_IMAGE      "디스크 이미지 {0}을(를) 열 수 없습니다:\n{1}"
     IDS_ERR_OPEN_DEVICE     "{0}을(를) 열 수 없습니다:\n{1}"

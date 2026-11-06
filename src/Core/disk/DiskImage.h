@@ -53,6 +53,16 @@ bool HasExtension(const std::wstring& path, const wchar_t* extension);
 // and .iso images are always opened read-only (shared).
 std::unique_ptr<Disk> OpenDiskImage(const std::wstring& path, bool readOnly, OpenError& error);
 
+// The format of an image file that can be a differencing parent or child, as
+// its canonical extension (".vhd", ".vhdx", ".vmdk"); nullptr for other files.
+const wchar_t* DifferencingExtension(const std::wstring& path);
+
+// Creates an empty differencing image at `path` (fails if the file exists)
+// whose parent is `parent`, an image opened with OpenDiskImage. The child has
+// the parent's format. Returns ERROR_SUCCESS or a Win32 error
+// (ERROR_NOT_SUPPORTED if the parent cannot have a child).
+DWORD CreateDifferencingImage(const std::wstring& path, const Disk& parent);
+
 namespace detail {
 // Differencing chains deeper than this are treated as corrupt (loops).
 constexpr int kMaxParentDepth = 32;

@@ -3,9 +3,13 @@
 
 #include "Core/disk/Vmdk.h"
 
+#include <objbase.h>
+
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cstring>
+#include <format>
 
 namespace tiscsi::disk {
 namespace {
@@ -27,6 +31,20 @@ void WriteLE32(uint8_t* p, uint32_t v)
     p[1] = static_cast<uint8_t>(v >> 8);
     p[2] = static_cast<uint8_t>(v >> 16);
     p[3] = static_cast<uint8_t>(v >> 24);
+}
+
+void WriteLE64(uint8_t* p, uint64_t v)
+{
+    WriteLE32(p, static_cast<uint32_t>(v));
+    WriteLE32(p + 4, static_cast<uint32_t>(v >> 32));
+}
+
+std::string ToUtf8(const std::wstring& text)
+{
+    const int length = WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
+    std::string result(length, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), length, nullptr, nullptr);
+    return result;
 }
 
 std::string_view Trim(std::string_view s)
@@ -636,6 +654,100 @@ IoResult VmdkDisk::Flush()
         ok = file->Flush() && ok;
     }
     return ok ? IoResult::Ok : IoResult::WriteError;
+}
+
+// ---- Creation ------------------------------------------------------------
+
+DWORD VmdkDisk::CreateChild(const std::wstring& path) const
+{
+    constexpr uint64_t kGrainSectors = 128;
+    constexpr uint32_t kEntriesPerTable = 512;
+    constexpr uint64_t kTableSectors = kEntriesPerTable * 4 / 512;
+    // A bare sparse extent has no content ID to record, and sparse extents
+    // address their grains with 32 bits.
+    if (m_cid == 0xFFFFFFFF || m_totalSectors > UINT32_MAX) {
+        return ERROR_NOT_SUPPORTED;
+    }
+    GUID guid;
+    if (FAILED(CoCreateGuid(&guid))) {
+        return ERROR_INVALID_PARAMETER;
+    }
+
+    const std::wstring fullPath = FullPath(path);
+    const std::wstring parentPath = FullPath(m_path);
+    std::wstring hint = RelativePathFrom(DirectoryOf(fullPath), parentPath);
+    if (hint.empty()) {
+        hint = parentPath;
+    } else if (hint.starts_with(L".\\")) {
+        hint.erase(0, 2);
+    }
+    const uint64_t cylinders = std::min<uint64_t>(m_totalSectors / (16 * 63), 16383);
+    const std::string descriptor = std::format(
+        "# Disk DescriptorFile\nversion=1\nencoding=\"UTF-8\"\nCID={:08x}\nparentCID={:08x}\n"
+        "isNativeSnapshot=\"no\"\ncreateType=\"monolithicSparse\"\nparentFileNameHint=\"{}\"\n\n"
+        "# Extent description\nRW {} SPARSE \"{}\"\n\n"
+        "# The Disk Data Base\n#DDB\n\nddb.virtualHWVersion = \"4\"\nddb.geometry.cylinders = \"{}\"\n"
+        "ddb.geometry.heads = \"16\"\nddb.geometry.sectors = \"63\"\nddb.adapterType = \"ide\"\n",
+        guid.Data1 & 0x7FFFFFFF, m_cid, ToUtf8(hint), m_totalSectors, ToUtf8(fullPath.substr(DirectoryOf(fullPath).size())),
+        cylinders);
+
+    // Header, descriptor, redundant directory and tables, directory and
+    // tables. All tables are allocated up front, as hosted sparse extents
+    // expect, and are zero: every grain comes from the parent.
+    const uint64_t grains = (m_totalSectors + kGrainSectors - 1) / kGrainSectors;
+    const uint64_t tables = (grains + kEntriesPerTable - 1) / kEntriesPerTable;
+    const uint64_t directorySectors = (tables * 4 + 511) / 512;
+    const uint64_t descriptorSectors = std::max<uint64_t>((descriptor.size() + 511) / 512, 20);
+    const uint64_t rgdOffset = 1 + descriptorSectors;
+    const uint64_t gdOffset = rgdOffset + directorySectors + tables * kTableSectors;
+    const uint64_t overHead =
+        (gdOffset + directorySectors + tables * kTableSectors + kGrainSectors - 1) / kGrainSectors * kGrainSectors;
+
+    std::array<uint8_t, 512> header{};
+    WriteLE32(&header[0], kSparseMagic);
+    WriteLE32(&header[4], 1);
+    WriteLE32(&header[8], 1 | kFlagRedundantGrainTable); // bit 0: the line ending bytes below are valid
+    WriteLE64(&header[12], m_totalSectors);
+    WriteLE64(&header[20], kGrainSectors);
+    WriteLE64(&header[28], 1);
+    WriteLE64(&header[36], descriptorSectors);
+    WriteLE32(&header[44], kEntriesPerTable);
+    WriteLE64(&header[48], rgdOffset);
+    WriteLE64(&header[56], gdOffset);
+    WriteLE64(&header[64], overHead);
+    header[73] = '\n';
+    header[74] = ' ';
+    header[75] = '\r';
+    header[76] = '\n';
+
+    auto makeDirectory = [&](uint64_t directoryOffset) {
+        std::vector<uint8_t> directory(static_cast<size_t>(directorySectors) * 512);
+        for (uint64_t i = 0; i < tables; ++i) {
+            WriteLE32(&directory[static_cast<size_t>(i) * 4],
+                      static_cast<uint32_t>(directoryOffset + directorySectors + i * kTableSectors));
+        }
+        return directory;
+    };
+    const std::vector<uint8_t> redundant = makeDirectory(rgdOffset);
+    const std::vector<uint8_t> directory = makeDirectory(gdOffset);
+
+    DWORD error = ERROR_SUCCESS;
+    NewFileGuard guard(path);
+    {
+        auto file = File::CreateNew(path, error);
+        if (!file) {
+            guard.Commit();
+            return error;
+        }
+        if (!file->SetSize(overHead * 512) || !file->WriteAt(0, header.data(), header.size()) ||
+            !file->WriteAt(512, descriptor.data(), descriptor.size()) ||
+            !file->WriteAt(rgdOffset * 512, redundant.data(), redundant.size()) ||
+            !file->WriteAt(gdOffset * 512, directory.data(), directory.size()) || !file->Flush()) {
+            return GetLastError();
+        }
+    }
+    guard.Commit();
+    return ERROR_SUCCESS;
 }
 
 } // namespace tiscsi::disk

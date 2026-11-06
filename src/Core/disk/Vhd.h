@@ -90,6 +90,9 @@ public:
     VhdFooter::DiskType Type() const { return m_footer.diskType; }
     const Guid16& UniqueId() const { return m_footer.uniqueId; }
 
+    // Creates an empty differencing image of this disk; see CreateDifferencingImage.
+    DWORD CreateChild(const std::wstring& path) const;
+
 private:
     VhdDisk(std::unique_ptr<File> file, const VhdFooter& footer);
 

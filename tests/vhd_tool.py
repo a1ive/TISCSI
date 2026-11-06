@@ -94,6 +94,16 @@ def create_differencing(child_path, parent_path, parent_id=None):
         f.write(footer)
 
 
+def _relative_locator(path, header):
+    """The parent's relative path from a W2ru locator, if there is one."""
+    for code, _, length, offset in header["locators"]:
+        if code == 0x57327275:  # "W2ru"
+            with open(path, "rb") as f:
+                f.seek(offset)
+                return f.read(length).decode("utf-16-le")
+    return None
+
+
 def read_disk(path):
     """Full contents of a fixed / dynamic / differencing VHD (follows parents)."""
     footer = read_footer(path)
@@ -104,7 +114,7 @@ def read_disk(path):
     header = read_dynamic_header(path, footer["data_offset"])
     parent = None
     if footer["disk_type"] == 4:
-        parent_path = os.path.join(os.path.dirname(path), header["parent_name"])
+        parent_path = os.path.join(os.path.dirname(path), _relative_locator(path, header) or header["parent_name"])
         assert read_footer(parent_path)["unique_id"] == header["parent_id"], "parent id mismatch"
         parent = read_disk(parent_path)
     block_size = header["block_size"]

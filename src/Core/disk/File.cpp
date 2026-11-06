@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <utility>
+#include <vector>
 
 namespace tiscsi::disk {
 namespace {
@@ -141,6 +142,45 @@ std::wstring ResolveRelative(const std::wstring& directory, const std::wstring& 
         relative.erase(0, 2);
     }
     return FullPath(directory + relative);
+}
+
+std::wstring RelativePathFrom(const std::wstring& directory, const std::wstring& path)
+{
+    auto split = [](const std::wstring& text) {
+        std::vector<std::wstring> parts;
+        size_t start = 0;
+        for (size_t end; (end = text.find(L'\\', start)) != std::wstring::npos; start = end + 1) {
+            parts.push_back(text.substr(start, end - start));
+        }
+        if (start < text.size()) {
+            parts.push_back(text.substr(start));
+        }
+        return parts;
+    };
+    const std::vector<std::wstring> from = split(FullPath(directory));
+    const std::vector<std::wstring> to = split(FullPath(path));
+    size_t common = 0;
+    while (common < from.size() && common + 1 < to.size() &&
+           CompareStringW(LOCALE_INVARIANT, NORM_IGNORECASE, from[common].c_str(), -1, to[common].c_str(), -1) ==
+               CSTR_EQUAL) {
+        ++common;
+    }
+    // The root must match: "C:", or the four parts of "\\server\share".
+    const bool unc = to.size() > 2 && to[0].empty() && to[1].empty();
+    if (common < (unc ? 4u : 1u)) {
+        return {};
+    }
+    std::wstring result = common == from.size() ? L".\\" : L"";
+    for (size_t i = common; i < from.size(); ++i) {
+        result += L"..\\";
+    }
+    for (size_t i = common; i < to.size(); ++i) {
+        result += to[i];
+        if (i + 1 < to.size()) {
+            result += L'\\';
+        }
+    }
+    return result;
 }
 
 } // namespace tiscsi::disk

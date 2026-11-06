@@ -187,8 +187,16 @@ These are deliberate. Don't "fix" them back to the original behavior.
   valid checkpoint before publishing its LogGuid. Old log regions remain
   unused. Failed writes latch an error until close. Pending logs are refused
   with ERROR_NOT_SUPPORTED and require recovery by an external VHDX tool.
-  `--create-vhd` still creates VHD. `tests/vhdx_tool.py` builds VHDX fixtures;
+  `--create-vhd` still creates VHD; the only VHDX files TISCSI creates are
+  children (below). `tests/vhdx_tool.py` builds VHDX fixtures;
   `tests/vhdx_faults.cpp` injects file write/flush/resize failures.
+- Differencing images (`CreateDifferencingImage`, GUI: Create Virtual Disk)
+  are created from an opened parent, which stays open read-only meanwhile, in
+  the parent's format: VHD (2 MiB blocks, W2ru + W2ku locators, the parent's
+  geometry), VHDX (2 MiB blocks, since writes materialize whole blocks; no
+  pending log) or monolithicSparse VMDK (preallocated, zero grain tables). The
+  parent is not marked: nothing stops it being written later except the
+  identity checks when the child opens.
 - Optical discs: `Disk::IsOpticalDisc()` makes `VirtualScsiTarget` report
   device type 5 and answer MMC commands (`scsi/MmcData`) for a finalized
   single-session disc with one data track. Up to 80 minutes (360000 sectors)
@@ -313,10 +321,13 @@ These are deliberate. Don't "fix" them back to the original behavior.
 - CHAP is checked against this repository's test initiator and (elevated
   optical test) the Microsoft initiator's one-way CHAP; mutual CHAP with
   the Microsoft or Linux initiator has not been tried.
+- Differencing images created by TISCSI are checked with this repository's
+  readers, qemu-img and vmware-vdiskmanager (VMDK), but have not been attached
+  by Windows (diskpart, Hyper-V): that needs administrator rights.
 - Manual checks on XP / Windows 7, including the CJK font fallback (SimSun,
   PMingLiU, Gulim on XP).
 - Not supported: compressed (streamOptimized) VMDK, VMFSSPARSE / SESPARSE,
-  raw device mappings, VHDX log replay or VHDX creation.
+  raw device mappings, VHDX log replay or creating non-differencing VHDX.
 - VHDX differencing and 4K-sector coverage uses specification fixtures.
   Hyper-V-created checkpoint chains and XP / Windows 7 runtime behavior
   need maintainer validation.

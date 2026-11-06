@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import iso_tool  # noqa: E402
 import ldm_tool  # noqa: E402
 import vhd_tool  # noqa: E402
+import vhdx_tool  # noqa: E402
 from test_vhdx import test_vhdx  # noqa: E402
 from initiator import DEFAULT_INITIATOR, Session, asc, cdb10, cdb16, sense_key  # noqa: E402
 
@@ -1807,6 +1808,7 @@ class Gui:
     IDCANCEL, IDM_FILE_OPEN_CONFIG, IDM_FILE_SAVE_CONFIG = 2, 40003, 40004
     IDC_ACCESS, IDC_ACCESS_SUMMARY, IDC_ALLOWED_INITIATORS = 1028, 1029, 1040
     IDC_CHAP_USER, IDC_CHAP_SECRET = 1041, 1042
+    IDC_CREATE_VHD, IDC_DYNAMIC, IDC_DIFFERENCING, IDC_PARENT = 1022, 1035, 1039, 1045
     IDC_STATIC_TEXT = 0xFFFF  # message box text
     BM_GETCHECK, BM_CLICK = 0x00F0, 0x00F5
 
@@ -2113,11 +2115,159 @@ def test_gui(ctx):
                 f.write(saved_ini)
 
 
+def test_gui_differencing(ctx):
+    gui_exe = os.path.join(os.path.dirname(ctx.exe), "TISCSI.exe")
+    if not os.path.exists(gui_exe):
+        print("  SKIP TISCSI.exe not found next to TISCSICli.exe")
+        return
+    ini = os.path.join(os.path.dirname(gui_exe), "TISCSI.ini")
+    saved_ini = open(ini, "rb").read() if os.path.exists(ini) else None
+
+    # Parents with the same content, in a folder next to the children's.
+    ref = reference_content()
+    base = ctx.path("gui-diff")
+    parents, children = os.path.join(base, "parents"), os.path.join(base, "children")
+    os.makedirs(parents)
+    os.makedirs(children)
+    vhd_parent = os.path.join(parents, "parent.vhd")
+    run_tool(ctx.exe, "--lang", "en-US", "--create-vhd", vhd_parent, "--size", "16M")
+    with open(vhd_parent, "r+b") as f:  # the data of a fixed VHD starts at offset 0
+        f.write(ref)
+    vhdx_parent = os.path.join(parents, "parent.vhdx")
+    vhdx_tool.create(vhdx_parent, size=IMAGE_SIZE,
+                     writes=[(0, ref[:MiB]), (5 * MiB, ref[5 * MiB:5 * MiB + MiB // 2])])
+    disks = [("VHD", vhd_parent, os.path.join(children, "child.vhd")),
+             ("VHDX", vhdx_parent, os.path.join(children, "child.vhdx"))]
+    vmdk_parent = os.path.join(parents, "parent.vmdk")
+    if QEMU_IMG:
+        raw = ctx.path("gui-diff.raw")
+        with open(raw, "wb") as f:
+            f.write(ref)
+        run_tool(QEMU_IMG, "convert", "-f", "raw", "-O", "vmdk", "-o", "subformat=monolithicSparse", raw, vmdk_parent)
+        disks.append(("VMDK", vmdk_parent, os.path.join(children, "child.vmdk")))
+    else:
+        print("  SKIP VMDK part: qemu-img not found (set TISCSI_QEMU_IMG)")
+    parent_files = {parent: open(parent, "rb").read() for _, parent, _ in disks}
+
+    gui = Gui(gui_exe, ["--lang=en-US"])
+    try:
+        def refused(dialog, child, parent):
+            """The message of the error box after OK; the dialog stays open."""
+            gui.set_text(dialog, Gui.IDC_PATH, child)
+            gui.set_text(dialog, Gui.IDC_PARENT, parent)
+            gui.command(dialog, Gui.IDOK)
+            box = gui.top_window()
+            if box in (None, dialog):
+                return ""
+            message = gui.text(gui.user32.GetDlgItem(box, Gui.IDC_STATIC_TEXT))
+            gui.command(box, Gui.IDCANCEL)
+            return message
+
+        main = gui.top_window()
+        gui.set_text(main, Gui.IDC_PORT, str(ctx.port))
+        gui.command(main, Gui.IDC_ADD_TARGET)
+        add = gui.top_window()
+        gui.set_text(add, Gui.IDC_TARGET_NAME, TARGET)
+
+        gui.command(add, Gui.IDC_CREATE_VHD)
+        dialog = gui.top_window()
+        enabled = lambda control: bool(gui.user32.IsWindowEnabled(gui.user32.GetDlgItem(dialog, control)))
+        ctx.check(not enabled(Gui.IDC_PARENT) and enabled(Gui.IDC_SIZE_MB) and enabled(Gui.IDC_DYNAMIC),
+                  "Create Virtual Disk: the parent is off until Differencing is checked")
+        gui.click(dialog, Gui.IDC_DIFFERENCING)
+        ctx.check(enabled(Gui.IDC_PARENT) and not enabled(Gui.IDC_SIZE_MB) and not enabled(Gui.IDC_DYNAMIC),
+                  "Differencing replaces the size and kind with the parent")
+        child = disks[0][2]
+        ctx.check("Choose the parent" in refused(dialog, child, ""), "Differencing needs a parent")
+        ctx.check("must be a VHD, VHDX or VMDK" in refused(dialog, child, ctx.path("parent.img")),
+                  "Differencing refuses a raw parent")
+        ctx.check("must end in .vhdx" in refused(dialog, child, vhdx_parent),
+                  "Differencing refuses a child in another format")
+        missing = ctx.path("missing.vhd")
+        ctx.check("missing.vhd" in refused(dialog, child, missing), "a missing parent is reported with its path")
+        ctx.check("Cannot create" in refused(dialog, vhd_parent, vhd_parent), "Differencing does not overwrite a file")
+        ctx.check(not os.path.exists(child), "nothing is created after a refusal")
+        gui.command(dialog, Gui.IDCANCEL)
+        time.sleep(0.5)
+
+        for label, parent, child in disks:
+            gui.command(add, Gui.IDC_CREATE_VHD)
+            dialog = gui.top_window()
+            gui.click(dialog, Gui.IDC_DIFFERENCING)
+            gui.set_text(dialog, Gui.IDC_PATH, child)
+            gui.set_text(dialog, Gui.IDC_PARENT, parent)
+            gui.command(dialog, Gui.IDOK)
+            time.sleep(0.5)
+            ctx.check(gui.top_window() == add and os.path.exists(child), f"{label}: the dialog creates the child")
+        gui.command(add, Gui.IDOK)
+        time.sleep(0.5)
+        gui.command(main, Gui.IDC_START)
+        time.sleep(1.0)
+
+        writes = write_plan()
+        expected = apply_writes(ref, writes)
+        s = ctx.session()
+        s.full_login(TARGET, [("MaxRecvDataSegmentLength", "262144")])
+        for lun, (label, _, _) in enumerate(disks):
+            st, size, _ = s.capacity(lun)
+            ctx.check(st == 0 and size == IMAGE_SIZE, f"{label} child: the parent's size")
+            ctx.check(read_all(s, lun) == ref, f"{label} child: starts with the parent's content")
+            ok = all(s.write(lba, data, lun=lun)[0] == 0 for lba, data in writes)
+            ctx.check(ok and read_all(s, lun) == expected, f"{label} child: writes read back")
+        s.logout()
+        time.sleep(0.5)
+        gui.user32.PostMessageW(main, Gui.WM_CLOSE, 0, 0)
+        gui.process.wait(timeout=10)
+    finally:
+        gui.close()
+        if saved_ini is None:
+            if os.path.exists(ini):
+                os.remove(ini)
+        else:
+            with open(ini, "wb") as f:
+                f.write(saved_ini)
+
+    for label, parent, child in disks:
+        ctx.check(open(parent, "rb").read() == parent_files[parent], f"{label} child: the parent file is unchanged")
+
+    # Independent readers of what was created.
+    child_vhd, child_vhdx = disks[0][2], disks[1][2]
+    ctx.check(vhd_tool.read_disk(child_vhd) == expected, "VHD child: spec reader sees child + parent")
+    ctx.check(all(vhdx_tool.read(child_vhdx, offset, 4096, vhdx_parent) == expected[offset:offset + 4096]
+                  for offset in (0, 64 * 512, 2 * MiB, 5 * MiB, 10 * MiB, IMAGE_SIZE - 4096)),
+              "VHDX child: spec reader sees child + parent")
+    if QEMU_IMG:
+        ctx.check(qemu_read(disks[2][2], "vmdk") == expected, "VMDK child: qemu-img sees child + parent")
+    if QEMU_IMG and VDISKMANAGER:
+        rc, out = run_tool(VDISKMANAGER, "-R", disks[2][2])
+        ctx.check(rc == 0, f"VMDK child: vmware-vdiskmanager finds it consistent ({out.strip()})")
+
+    def serves(files):
+        with Server(ctx, ["--target", TARGET] + [a for f in files for a in ("--image-ro", f)]):
+            s = ctx.session()
+            s.full_login(TARGET, [("MaxRecvDataSegmentLength", "262144")])
+            ok = all(read_all(s, lun) == expected for lun in range(len(files)))
+            s.logout()
+        return ok
+
+    # The children find their parents by relative path when everything moves,
+    # and VHD and VHDX by absolute path when only the children move.
+    moved = ctx.path("gui-diff-moved")
+    os.rename(base, moved)
+    ctx.check(serves([os.path.join(moved, "children", os.path.basename(child)) for _, _, child in disks]),
+              "children find their parents after moving both (relative paths)")
+    os.rename(moved, base)
+    alone = ctx.path("gui-diff-children-moved")
+    os.rename(children, alone)
+    ctx.check(serves([os.path.join(alone, os.path.basename(child_vhd)), os.path.join(alone, os.path.basename(child_vhdx))]),
+              "VHD and VHDX children find their parents after moving alone (absolute paths)")
+
+
 TESTS = [test_cli_errors, test_protocol, test_verify, test_synchronize_cache,
          test_exclusive_image, test_stop_with_sessions, test_image_formats_qemu,
          test_vhdx, test_create_vhd, test_differencing_vhd, test_image_formats_vmware, test_optical_images,
          test_config_files, test_access, test_service, test_service_elevated, test_optical_elevated, test_devices_unprivileged,
-         test_devices_elevated, test_dynamic_volumes, test_dynamic_volumes_elevated, test_gui]
+         test_devices_elevated, test_dynamic_volumes, test_dynamic_volumes_elevated, test_gui, test_gui_differencing]
 
 
 def main():

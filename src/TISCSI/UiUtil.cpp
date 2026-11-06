@@ -135,7 +135,11 @@ std::wstring ExplainOpenError(const disk::OpenError& error, bool device)
 
 std::optional<std::wstring> BrowseForFile(HWND owner, UINT filterId, bool save, const wchar_t* defaultExtension)
 {
-    std::wstring filter = i18n::Str(filterId);
+    return BrowseForFile(owner, i18n::Str(filterId), save, defaultExtension);
+}
+
+std::optional<std::wstring> BrowseForFile(HWND owner, std::wstring filter, bool save, const wchar_t* defaultExtension)
+{
     std::replace(filter.begin(), filter.end(), L'|', L'\0');
     filter.push_back(L'\0');
     std::vector<wchar_t> path(32768, L'\0');

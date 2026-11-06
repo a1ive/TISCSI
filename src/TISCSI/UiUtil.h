@@ -33,8 +33,9 @@ bool Confirm(HWND owner, const std::wstring& text);
 // access was denied). `device`: a physical disk or volume rather than a file.
 std::wstring ExplainOpenError(const disk::OpenError& error, bool device);
 
-// Open / Save As dialog; `filterId` names a string of '|'-separated pairs.
+// Open / Save As dialog; the filter is a string of '|'-separated pairs.
 std::optional<std::wstring> BrowseForFile(HWND owner, UINT filterId, bool save, const wchar_t* defaultExtension);
+std::optional<std::wstring> BrowseForFile(HWND owner, std::wstring filter, bool save, const wchar_t* defaultExtension);
 
 // Range-checked integer from an edit control (MB values in the size fields).
 std::optional<uint64_t> GetNumber(HWND dialog, int controlId, uint64_t minimum, uint64_t maximum);

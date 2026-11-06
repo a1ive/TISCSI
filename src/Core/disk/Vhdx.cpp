@@ -30,6 +30,11 @@ uint32_t Le32(const uint8_t* p)
     return static_cast<uint32_t>(Le16(p)) | static_cast<uint32_t>(Le16(p + 2)) << 16;
 }
 uint64_t Le64(const uint8_t* p) { return Le32(p) | static_cast<uint64_t>(Le32(p + 4)) << 32; }
+void Put16(uint8_t* p, uint16_t v)
+{
+    p[0] = static_cast<uint8_t>(v);
+    p[1] = static_cast<uint8_t>(v >> 8);
+}
 void Put32(uint8_t* p, uint32_t v)
 {
     for (unsigned i = 0; i < 4; ++i) p[i] = static_cast<uint8_t>(v >> (8 * i));
@@ -227,7 +232,7 @@ bool VhdxDisk::Load(OpenError& error, int depth)
     const bool hasParent = (parameters & 2) != 0;
     m_size = Le64(items[kDiskSize].data());
     m_sectorSize = Le32(items[kLogicalSector].data());
-    const uint32_t physical = Le32(items[kPhysicalSector].data());
+    const uint32_t physical = m_physicalSectorSize = Le32(items[kPhysicalSector].data());
     if (parameters & ~3u || m_blockSize < kMiB || m_blockSize > 256 * kMiB ||
         (m_blockSize & (m_blockSize - 1)) || (m_sectorSize != 512 && m_sectorSize != 4096) ||
         (physical != 512 && physical != 4096) || !m_size || m_size > (64ull << 40) ||
@@ -508,6 +513,133 @@ IoResult VhdxDisk::Flush()
 {
     if (m_failed) return IoResult::WriteError;
     return IsReadOnly() || m_file->Flush() ? IoResult::Ok : IoResult::WriteError;
+}
+
+DWORD VhdxDisk::CreateChild(const std::wstring& path) const
+{
+    // Writes materialize whole blocks, so children use a small block size.
+    constexpr uint32_t kChildBlockSize = 2 * kMiB;
+    constexpr uint64_t kMetadataOffset = 2 * kMiB, kBatOffset = 3 * kMiB;
+    const uint64_t ratio = (1ull << 23) * m_sectorSize / kChildBlockSize;
+    const uint64_t blocks = (m_size + kChildBlockSize - 1) / kChildBlockSize;
+    const uint64_t chunks = (blocks + ratio - 1) / ratio;
+    const auto batLength = static_cast<uint32_t>(((chunks * (ratio + 1) * 8 + kMiB - 1) / kMiB) * kMiB);
+
+    // Parent locator: the parent's DataWriteGuid and where to find the file.
+    const std::wstring parentPath = FullPath(m_file->Path());
+    GUID linkage;
+    std::memcpy(&linkage, m_header.data() + 32, sizeof(linkage));
+    wchar_t linkageText[40];
+    if (!StringFromGUID2(linkage, linkageText, 40)) return ERROR_INVALID_PARAMETER;
+    std::vector<std::pair<std::wstring, std::wstring>> fields{{L"parent_linkage", linkageText}};
+    if (auto relative = RelativePathFrom(DirectoryOf(FullPath(path)), parentPath); !relative.empty()) {
+        fields.emplace_back(L"relative_path", std::move(relative));
+    }
+    fields.emplace_back(L"absolute_win32_path",
+                        parentPath.starts_with(L"\\\\?\\") ? parentPath :
+                        parentPath.starts_with(L"\\\\") ? L"\\\\?\\UNC\\" + parentPath.substr(2) :
+                        L"\\\\?\\" + parentPath);
+    std::vector<uint8_t> locator(20 + fields.size() * 12);
+    std::memcpy(locator.data(), kParentType.data(), kParentType.size());
+    Put16(locator.data() + 18, static_cast<uint16_t>(fields.size()));
+    auto append = [&locator](const std::wstring& text) {
+        const auto* bytes = reinterpret_cast<const uint8_t*>(text.data());
+        locator.insert(locator.end(), bytes, bytes + text.size() * sizeof(wchar_t));
+    };
+    for (size_t i = 0; i < fields.size(); ++i) {
+        const size_t keyOffset = locator.size();
+        append(fields[i].first);
+        const size_t valueOffset = locator.size();
+        append(fields[i].second);
+        uint8_t* entry = locator.data() + 20 + i * 12;
+        Put32(entry, static_cast<uint32_t>(keyOffset));
+        Put32(entry + 4, static_cast<uint32_t>(valueOffset));
+        Put16(entry + 8, static_cast<uint16_t>(fields[i].first.size() * sizeof(wchar_t)));
+        Put16(entry + 10, static_cast<uint16_t>(fields[i].second.size() * sizeof(wchar_t)));
+    }
+
+    // Metadata region: a table in the first 64 KiB, then the items.
+    std::array<uint8_t, 8> parameters{}, size{};
+    std::array<uint8_t, 16> diskId{};
+    std::array<uint8_t, 4> logical{}, physical{};
+    Put32(parameters.data(), kChildBlockSize);
+    Put32(parameters.data() + 4, 2); // HasParent
+    Put64(size.data(), m_size);
+    Put32(logical.data(), m_sectorSize);
+    Put32(physical.data(), m_physicalSectorSize);
+    if (!NewGuid(diskId.data())) return ERROR_INVALID_PARAMETER;
+    const struct {
+        const Guid& id;
+        std::span<const uint8_t> value;
+        uint32_t flags; // 2: IsVirtualDisk, 4: IsRequired
+    } items[] = {{kParameters, parameters, 4}, {kDiskSize, size, 6},  {kDiskId, diskId, 6},
+                 {kLogicalSector, logical, 6}, {kPhysicalSector, physical, 6}, {kParent, locator, 4}};
+    std::vector<uint8_t> metadata(static_cast<size_t>(kMiB));
+    std::memcpy(metadata.data(), "metadata", 8);
+    Put16(metadata.data() + 10, static_cast<uint16_t>(std::size(items)));
+    uint32_t itemOffset = 65536;
+    for (size_t i = 0; i < std::size(items); ++i) {
+        uint8_t* entry = metadata.data() + 32 + i * 32;
+        std::memcpy(entry, items[i].id.data(), items[i].id.size());
+        Put32(entry + 16, itemOffset);
+        Put32(entry + 20, static_cast<uint32_t>(items[i].value.size()));
+        Put32(entry + 24, items[i].flags);
+        std::memcpy(metadata.data() + itemOffset, items[i].value.data(), items[i].value.size());
+        itemOffset += static_cast<uint32_t>(items[i].value.size());
+    }
+
+    std::vector<uint8_t> regions(65536);
+    std::memcpy(regions.data(), "regi", 4);
+    Put32(regions.data() + 8, 2);
+    const struct {
+        const Guid& id;
+        uint64_t offset;
+        uint32_t length;
+    } entries[] = {{kMetadata, kMetadataOffset, static_cast<uint32_t>(kMiB)}, {kBat, kBatOffset, batLength}};
+    for (size_t i = 0; i < std::size(entries); ++i) {
+        uint8_t* entry = regions.data() + 16 + i * 32;
+        std::memcpy(entry, entries[i].id.data(), entries[i].id.size());
+        Put64(entry + 16, entries[i].offset);
+        Put32(entry + 24, entries[i].length);
+        Put32(entry + 28, 1); // required
+    }
+    Put32(regions.data() + 4, Crc32c(regions));
+
+    // No log to replay (LogGuid zero). The log region and the BAT are zero:
+    // every block is not present, so reads go to the parent.
+    std::array<uint8_t, 4096> header{};
+    std::memcpy(header.data(), "head", 4);
+    if (!NewGuid(header.data() + 16) || !NewGuid(header.data() + 32)) return ERROR_INVALID_PARAMETER;
+    Put16(header.data() + 66, 1);
+    Put32(header.data() + 68, static_cast<uint32_t>(kMiB));
+    Put64(header.data() + 72, kMiB);
+    std::array<uint8_t, 8 + 12> identifier{};
+    std::memcpy(identifier.data(), "vhdxfile", 8);
+    for (size_t i = 0; i < 6; ++i) identifier[8 + i * 2] = static_cast<uint8_t>("TISCSI"[i]);
+
+    DWORD error = ERROR_SUCCESS;
+    NewFileGuard guard(path);
+    {
+        auto file = File::CreateNew(path, error);
+        if (!file) {
+            guard.Commit();
+            return error;
+        }
+        bool ok = file->SetSize(kBatOffset + batLength) && file->WriteAt(0, identifier.data(), identifier.size());
+        for (uint64_t sequence = 1; ok && sequence <= 2; ++sequence) {
+            Put64(header.data() + 8, sequence);
+            Put32(header.data() + 4, 0);
+            Put32(header.data() + 4, Crc32c(header));
+            ok = file->WriteAt(sequence * 65536, header.data(), header.size());
+        }
+        if (!ok || !file->WriteAt(196608, regions.data(), regions.size()) ||
+            !file->WriteAt(262144, regions.data(), regions.size()) ||
+            !file->WriteAt(kMetadataOffset, metadata.data(), metadata.size()) || !file->Flush()) {
+            return GetLastError();
+        }
+    }
+    guard.Commit();
+    return ERROR_SUCCESS;
 }
 
 } // namespace tiscsi::disk

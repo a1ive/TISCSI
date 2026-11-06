@@ -26,6 +26,31 @@ std::unique_ptr<Disk> OpenDiskImage(const std::wstring& path, bool readOnly, Ope
     return detail::OpenDiskImage(path, readOnly, error, 0);
 }
 
+const wchar_t* DifferencingExtension(const std::wstring& path)
+{
+    if (HasExtension(path, L".vhd")) {
+        return L".vhd";
+    }
+    if (HasExtension(path, L".vhdx") || HasExtension(path, L".avhdx")) {
+        return L".vhdx";
+    }
+    return HasExtension(path, L".vmdk") ? L".vmdk" : nullptr;
+}
+
+DWORD CreateDifferencingImage(const std::wstring& path, const Disk& parent)
+{
+    if (const auto* vhd = dynamic_cast<const VhdDisk*>(&parent)) {
+        return vhd->CreateChild(path);
+    }
+    if (const auto* vhdx = dynamic_cast<const VhdxDisk*>(&parent)) {
+        return vhdx->CreateChild(path);
+    }
+    if (const auto* vmdk = dynamic_cast<const VmdkDisk*>(&parent)) {
+        return vmdk->CreateChild(path);
+    }
+    return ERROR_NOT_SUPPORTED;
+}
+
 std::unique_ptr<Disk> detail::OpenDiskImage(const std::wstring& path, bool readOnly, OpenError& error, int depth)
 {
     if (HasExtension(path, L".vhdx") || HasExtension(path, L".avhdx")) {

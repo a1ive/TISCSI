@@ -28,6 +28,9 @@ public:
     IoResult WriteSectors(uint64_t lba, std::span<const uint8_t> data) override;
     IoResult Flush() override;
 
+    // Creates an empty differencing image of this disk; see CreateDifferencingImage.
+    DWORD CreateChild(const std::wstring& path) const;
+
 private:
     explicit VhdxDisk(std::unique_ptr<File> file) : m_file(std::move(file)) {}
     bool Load(OpenError& error, int depth);
@@ -47,6 +50,7 @@ private:
     uint64_t m_fileSize = 0;
     uint64_t m_batOffset = 0;
     uint32_t m_sectorSize = 0;
+    uint32_t m_physicalSectorSize = 0;
     uint32_t m_blockSize = 0;
     uint32_t m_chunkRatio = 0;
     std::vector<uint64_t> m_bat;

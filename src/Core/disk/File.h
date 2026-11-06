@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace tiscsi::disk {
 
@@ -52,5 +53,27 @@ std::wstring FullPath(const std::wstring& path);
 std::wstring DirectoryOf(const std::wstring& path);
 // `path` if absolute, otherwise `directory` + `path`.
 std::wstring ResolveRelative(const std::wstring& directory, const std::wstring& path);
+// `path` relative to `directory` (".\name", "..\dir\name"), "" if they are
+// on different volumes.
+std::wstring RelativePathFrom(const std::wstring& directory, const std::wstring& path);
+
+// Deletes a newly created file unless Commit() was called. Close the file first.
+class NewFileGuard {
+public:
+    explicit NewFileGuard(std::wstring path) : m_path(std::move(path)) {}
+    ~NewFileGuard()
+    {
+        if (!m_committed) {
+            DeleteFileW(m_path.c_str());
+        }
+    }
+    NewFileGuard(const NewFileGuard&) = delete;
+    NewFileGuard& operator=(const NewFileGuard&) = delete;
+    void Commit() { m_committed = true; }
+
+private:
+    std::wstring m_path;
+    bool m_committed = false;
+};
 
 } // namespace tiscsi::disk

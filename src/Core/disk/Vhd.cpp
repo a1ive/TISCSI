@@ -42,14 +42,19 @@ uint32_t Checksum(const uint8_t* bytes, size_t length, size_t checksumOffset)
     return ~sum;
 }
 
-uint32_t CurrentTimeStamp()
+uint32_t ToTimeStamp(const FILETIME& ft)
 {
     // FILETIME of 2000-01-01 00:00:00 UTC
     constexpr uint64_t kEpoch2000 = 125911584000000000ull;
+    const uint64_t time = static_cast<uint64_t>(ft.dwHighDateTime) << 32 | ft.dwLowDateTime;
+    return time > kEpoch2000 ? static_cast<uint32_t>((time - kEpoch2000) / 10000000) : 0;
+}
+
+uint32_t CurrentTimeStamp()
+{
     FILETIME ft;
     GetSystemTimeAsFileTime(&ft);
-    const uint64_t now = static_cast<uint64_t>(ft.dwHighDateTime) << 32 | ft.dwLowDateTime;
-    return now > kEpoch2000 ? static_cast<uint32_t>((now - kEpoch2000) / 10000000) : 0;
+    return ToTimeStamp(ft);
 }
 
 Guid16 NewUniqueId()
@@ -589,23 +594,6 @@ DWORD ValidateNewSize(uint64_t size)
     return size == 0 || size % 512 != 0 || size > kMaxVhdSize ? ERROR_INVALID_PARAMETER : ERROR_SUCCESS;
 }
 
-// Deletes the file unless Commit() was called.
-class NewFileGuard {
-public:
-    explicit NewFileGuard(std::wstring path) : m_path(std::move(path)) {}
-    ~NewFileGuard()
-    {
-        if (!m_committed) {
-            DeleteFileW(m_path.c_str());
-        }
-    }
-    void Commit() { m_committed = true; }
-
-private:
-    std::wstring m_path;
-    bool m_committed = false;
-};
-
 } // namespace
 
 DWORD CreateFixedVhd(const std::wstring& path, uint64_t size, const CreateProgress& progress)
@@ -670,6 +658,84 @@ DWORD CreateDynamicVhd(const std::wstring& path, uint64_t size)
             !file->WriteAt(VhdFooter::kSize, headerBytes.data(), headerBytes.size()) ||
             !file->WriteAt(header.tableOffset, table.data(), table.size()) ||
             !file->WriteAt(header.tableOffset + tableSize, footerBytes.data(), footerBytes.size()) || !file->Flush()) {
+            return GetLastError();
+        }
+    }
+    guard.Commit();
+    return ERROR_SUCCESS;
+}
+
+DWORD VhdDisk::CreateChild(const std::wstring& path) const
+{
+    const std::wstring parentPath = FullPath(m_file->Path());
+    WIN32_FILE_ATTRIBUTE_DATA attributes;
+    if (!GetFileAttributesExW(parentPath.c_str(), GetFileExInfoStandard, &attributes)) {
+        return GetLastError();
+    }
+
+    // The same size and geometry as the parent.
+    VhdFooter footer = m_footer;
+    footer.dataOffset = VhdFooter::kSize;
+    footer.timeStamp = CurrentTimeStamp();
+    footer.creatorApplication = kCreatorApplication;
+    footer.creatorVersion = kCreatorVersion;
+    footer.creatorHostOs = kCreatorHostWindows;
+    footer.diskType = VhdFooter::DiskType::Differencing;
+    footer.uniqueId = NewUniqueId();
+    footer.savedState = 0;
+
+    VhdDynamicHeader header;
+    header.tableOffset = VhdFooter::kSize + VhdDynamicHeader::kSize;
+    header.maxTableEntries = static_cast<uint32_t>((footer.currentSize + header.blockSize - 1) / header.blockSize);
+    header.parentUniqueId = m_footer.uniqueId;
+    header.parentTimeStamp = ToTimeStamp(attributes.ftLastWriteTime);
+    header.parentUnicodeName = parentPath.substr(DirectoryOf(parentPath).size());
+    const uint64_t tableSize = (static_cast<uint64_t>(header.maxTableEntries) * 4 + 511) / 512 * 512;
+
+    // Parent locators follow the table, each in its own sectors. There is no
+    // relative path between volumes.
+    struct Locator {
+        uint32_t code;
+        std::wstring text;
+    };
+    std::vector<Locator> locators;
+    if (std::wstring relative = RelativePathFrom(DirectoryOf(FullPath(path)), parentPath); !relative.empty()) {
+        locators.push_back({kPlatformW2ru, std::move(relative)});
+    }
+    locators.push_back({kPlatformW2ku, parentPath});
+    uint64_t end = header.tableOffset + tableSize;
+    for (size_t i = 0; i < locators.size(); ++i) {
+        const auto length = static_cast<uint32_t>(locators[i].text.size() * sizeof(wchar_t));
+        const uint32_t sectors = (length + 511) / 512;
+        header.parentLocators[i] = {locators[i].code, sectors, length, end};
+        end += static_cast<uint64_t>(sectors) * 512;
+    }
+
+    DWORD error = ERROR_SUCCESS;
+    NewFileGuard guard(path);
+    {
+        auto file = File::CreateNew(path, error);
+        if (!file) {
+            guard.Commit();
+            return error;
+        }
+        const std::vector<uint8_t> table(static_cast<size_t>(tableSize), 0xFF); // all entries unused
+        const auto footerBytes = footer.Serialize();
+        const auto headerBytes = header.Serialize();
+        if (!file->WriteAt(0, footerBytes.data(), footerBytes.size()) ||
+            !file->WriteAt(VhdFooter::kSize, headerBytes.data(), headerBytes.size()) ||
+            !file->WriteAt(header.tableOffset, table.data(), table.size())) {
+            return GetLastError();
+        }
+        for (size_t i = 0; i < locators.size(); ++i) {
+            // UTF-16LE, not terminated. Sector padding comes from the footer
+            // being written after the end of the last locator.
+            if (!file->WriteAt(header.parentLocators[i].platformDataOffset, locators[i].text.data(),
+                               header.parentLocators[i].platformDataLength)) {
+                return GetLastError();
+            }
+        }
+        if (!file->WriteAt(end, footerBytes.data(), footerBytes.size()) || !file->Flush()) {
             return GetLastError();
         }
     }

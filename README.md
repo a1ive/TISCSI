@@ -130,7 +130,12 @@ VHDX files (`.vhdx` and `.avhdx`) support read-write and read-only access,
 Differencing parents are opened read-only and checked against the child's
 stored `DataWriteGuid`, size and logical sector size. Keep the parent chain
 available at its recorded relative or Windows path. `--create-vhd` creates
-VHD files; create VHDX files with an external tool.
+VHD files; create other VHDX files with an external tool.
+
+The GUI's Create Virtual Disk window can also create a differencing image of
+an existing VHD, VHDX or VMDK file. The child has its parent's format and
+size, and records its parent's relative and absolute paths (VMDK: one path,
+relative if possible). Don't write to a parent after creating a child.
 
 VHDX files with a pending recovery log are refused with error 50
 (`ERROR_NOT_SUPPORTED`). Recover such a file with a VHDX tool before serving

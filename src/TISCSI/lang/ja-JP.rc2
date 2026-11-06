@@ -107,7 +107,7 @@ BEGIN
     PUSHBUTTON      "キャンセル", IDCANCEL, 203, 58, 50, 14
 END
 
-IDD_CREATE_VHD DIALOGEX 0, 0, 260, 96
+IDD_CREATE_VHD DIALOGEX 0, 0, 260, 127
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "仮想ディスクの作成"
 FONT 9, "MS UI Gothic", 0, 0, 0x80
@@ -120,9 +120,13 @@ BEGIN
     CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 118, 26, 10, 13
     LTEXT           "MB", IDC_STATIC, 123, 28, 20, 9
     AUTOCHECKBOX    "容量可変(&D)", IDC_DYNAMIC, 58, 45, 160, 10
-    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 61, 246, 9
-    DEFPUSHBUTTON   "OK", IDOK, 146, 76, 50, 14
-    PUSHBUTTON      "キャンセル", IDCANCEL, 203, 76, 50, 14
+    AUTOCHECKBOX    "親ディスクの差分イメージ(&I)", IDC_DIFFERENCING, 58, 59, 180, 10
+    LTEXT           "親(&P):", IDC_STATIC, 7, 74, 50, 9
+    EDITTEXT        IDC_PARENT, 58, 72, 140, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "参照(&W)...", IDC_BROWSE_PARENT, 203, 71, 50, 15
+    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 92, 246, 9
+    DEFPUSHBUTTON   "OK", IDOK, 146, 107, 50, 14
+    PUSHBUTTON      "キャンセル", IDCANCEL, 203, 107, 50, 14
 END
 
 IDD_CREATE_RAMDISK DIALOGEX 0, 0, 190, 50
@@ -207,6 +211,11 @@ BEGIN
     IDS_ERR_NO_DISKS        "ターゲットにディスクを 1 つ以上追加してください。"
     IDS_FILTER_IMAGES       "ディスク イメージ (*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso)|*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso|すべてのファイル (*.*)|*.*|"
     IDS_FILTER_VHD          "仮想ハード ディスク (*.vhd)|*.vhd|"
+    IDS_FILTER_VIRTUAL_DISKS "仮想ディスク (*.vhd;*.vhdx;*.avhdx;*.vmdk)|*.vhd;*.vhdx;*.avhdx;*.vmdk|"
+    IDS_FILTER_DIFFERENCING "差分イメージ (*{0})|*{0}|"
+    IDS_ERR_NO_PARENT       "親仮想ディスクを選択してください。"
+    IDS_ERR_PARENT_FORMAT   "親は VHD、VHDX、VMDK のいずれかのファイルである必要があります。"
+    IDS_ERR_CHILD_FORMAT    "差分イメージの形式は親と同じです。ファイル名の末尾は {0} にしてください。"
     IDS_ERR_NO_FILE         "ファイルを指定してください。"
     IDS_ERR_OPEN_IMAGE      "ディスク イメージ {0} を開けません:\n{1}"
     IDS_ERR_OPEN_DEVICE     "{0} を開けません:\n{1}"

@@ -103,7 +103,7 @@ BEGIN
     PUSHBUTTON      "İptal", IDCANCEL, 187, 58, 50, 14
 END
 
-IDD_CREATE_VHD DIALOGEX 0, 0, 244, 96
+IDD_CREATE_VHD DIALOGEX 0, 0, 244, 127
 STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Sanal Disk Oluştur"
 FONT 8, "MS Shell Dlg", 0, 0, 0x1
@@ -116,9 +116,13 @@ BEGIN
     CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 95, 26, 10, 13
     LTEXT           "MB", IDC_STATIC, 100, 28, 20, 8
     AUTOCHECKBOX    "&Dinamik olarak genişleyen", IDC_DYNAMIC, 35, 45, 160, 10
-    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 61, 230, 9
-    DEFPUSHBUTTON   "Tamam", IDOK, 130, 76, 50, 14
-    PUSHBUTTON      "İptal", IDCANCEL, 187, 76, 50, 14
+    AUTOCHECKBOX    "Bir üst diskin &fark alma görüntüsü", IDC_DIFFERENCING, 35, 59, 180, 10
+    LTEXT           "Ü&st:", IDC_STATIC, 7, 74, 26, 8
+    EDITTEXT        IDC_PARENT, 35, 72, 146, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "Gö&zat...", IDC_BROWSE_PARENT, 187, 71, 50, 15
+    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 92, 230, 9
+    DEFPUSHBUTTON   "Tamam", IDOK, 130, 107, 50, 14
+    PUSHBUTTON      "İptal", IDCANCEL, 187, 107, 50, 14
 END
 
 IDD_CREATE_RAMDISK DIALOGEX 0, 0, 180, 50
@@ -203,6 +207,11 @@ BEGIN
     IDS_ERR_NO_DISKS        "Hedefe en az bir disk ekleyin."
     IDS_FILTER_IMAGES       "Disk görüntüleri (*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso)|*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso|Tüm dosyalar (*.*)|*.*|"
     IDS_FILTER_VHD          "Sanal sabit diskler (*.vhd)|*.vhd|"
+    IDS_FILTER_VIRTUAL_DISKS "Sanal diskler (*.vhd;*.vhdx;*.avhdx;*.vmdk)|*.vhd;*.vhdx;*.avhdx;*.vmdk|"
+    IDS_FILTER_DIFFERENCING "Fark alma görüntüleri (*{0})|*{0}|"
+    IDS_ERR_NO_PARENT       "Üst sanal diski seçin."
+    IDS_ERR_PARENT_FORMAT   "Üst disk bir VHD, VHDX veya VMDK dosyası olmalıdır."
+    IDS_ERR_CHILD_FORMAT    "Fark alma görüntüsü üst diskiyle aynı biçimdedir: dosya adı {0} ile bitmelidir."
     IDS_ERR_NO_FILE         "Bir dosya seçin."
     IDS_ERR_OPEN_IMAGE      "{0} disk görüntüsü açılamadı:\n{1}"
     IDS_ERR_OPEN_DEVICE     "{0} açılamadı:\n{1}"

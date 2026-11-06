@@ -107,6 +107,10 @@ public:
 
     uint32_t ContentId() const { return m_cid; }
 
+    // Creates an empty monolithicSparse delta disk of this disk; see
+    // CreateDifferencingImage.
+    DWORD CreateChild(const std::wstring& path) const;
+
 private:
     enum class ExtentType { Flat, Sparse, Zero };
     struct Extent {

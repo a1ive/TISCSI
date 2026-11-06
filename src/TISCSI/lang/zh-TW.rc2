@@ -107,7 +107,7 @@ BEGIN
     PUSHBUTTON      "取消", IDCANCEL, 203, 58, 50, 14
 END
 
-IDD_CREATE_VHD DIALOGEX 0, 0, 260, 96
+IDD_CREATE_VHD DIALOGEX 0, 0, 260, 127
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "建立虛擬磁碟"
 FONT 9, "Microsoft JhengHei", 0, 0, 0x88
@@ -120,9 +120,13 @@ BEGIN
     CONTROL         "", IDC_SIZE_SPIN, "msctls_updown32", UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS, 118, 26, 10, 13
     LTEXT           "MB", IDC_STATIC, 123, 28, 20, 9
     AUTOCHECKBOX    "動態擴充(&D)", IDC_DYNAMIC, 58, 45, 160, 10
-    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 61, 246, 9
-    DEFPUSHBUTTON   "確定", IDOK, 146, 76, 50, 14
-    PUSHBUTTON      "取消", IDCANCEL, 203, 76, 50, 14
+    AUTOCHECKBOX    "以父磁碟為基礎的差異映像(&I)", IDC_DIFFERENCING, 58, 59, 180, 10
+    LTEXT           "父磁碟(&P):", IDC_STATIC, 7, 74, 50, 9
+    EDITTEXT        IDC_PARENT, 58, 72, 140, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "瀏覽(&W)...", IDC_BROWSE_PARENT, 203, 71, 50, 15
+    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 7, 92, 246, 9
+    DEFPUSHBUTTON   "確定", IDOK, 146, 107, 50, 14
+    PUSHBUTTON      "取消", IDCANCEL, 203, 107, 50, 14
 END
 
 IDD_CREATE_RAMDISK DIALOGEX 0, 0, 190, 50
@@ -207,6 +211,11 @@ BEGIN
     IDS_ERR_NO_DISKS        "請至少為目標新增一個磁碟。"
     IDS_FILTER_IMAGES       "磁碟映像 (*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso)|*.vhd;*.vhdx;*.avhdx;*.vmdk;*.img;*.iso|所有檔案 (*.*)|*.*|"
     IDS_FILTER_VHD          "虛擬硬碟 (*.vhd)|*.vhd|"
+    IDS_FILTER_VIRTUAL_DISKS "虛擬磁碟 (*.vhd;*.vhdx;*.avhdx;*.vmdk)|*.vhd;*.vhdx;*.avhdx;*.vmdk|"
+    IDS_FILTER_DIFFERENCING "差異映像 (*{0})|*{0}|"
+    IDS_ERR_NO_PARENT       "請選擇父虛擬磁碟。"
+    IDS_ERR_PARENT_FORMAT   "父磁碟必須是 VHD、VHDX 或 VMDK 檔案。"
+    IDS_ERR_CHILD_FORMAT    "差異映像的格式與父磁碟相同：檔案名稱必須以 {0} 結尾。"
     IDS_ERR_NO_FILE         "請選擇檔案。"
     IDS_ERR_OPEN_IMAGE      "無法開啟磁碟映像 {0}:\n{1}"
     IDS_ERR_OPEN_DEVICE     "無法開啟 {0}:\n{1}"

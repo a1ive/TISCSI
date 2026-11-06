@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <atomic>
 #include <cwctype>
+#include <memory>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -158,7 +160,7 @@ private:
     DiskChoice& m_choice;
 };
 
-// ---- New VHD ---------------------------------------------------------------
+// ---- New VHD or differencing image -----------------------------------------
 
 class CreateVhdDialog final : public DialogBase {
 public:
@@ -177,15 +179,41 @@ private:
     {
         SetupSizeSpin(m_dialog, 1, kMaxSizeMb, 1024);
         SendDlgItemMessageW(m_dialog, IDC_PROGRESS, PBM_SETRANGE32, 0, 100);
+        UpdateControls();
     }
 
     void OnCommand(UINT id) override
     {
-        if (id == IDC_BROWSE && !m_working) {
-            if (auto path = ui::BrowseForFile(m_dialog, IDS_FILTER_VHD, true, L"vhd")) {
+        if (m_working) {
+            return;
+        }
+        if (id == IDC_BROWSE) {
+            if (auto path = BrowseForNewFile()) {
                 SetDlgItemTextW(m_dialog, IDC_PATH, path->c_str());
             }
+        } else if (id == IDC_BROWSE_PARENT) {
+            if (auto path = ui::BrowseForFile(m_dialog, IDS_FILTER_VIRTUAL_DISKS, false, nullptr)) {
+                SetDlgItemTextW(m_dialog, IDC_PARENT, path->c_str());
+            }
+        } else if (id == IDC_DIFFERENCING) {
+            UpdateControls();
         }
+    }
+
+    bool IsDifferencing() const { return IsDlgButtonChecked(m_dialog, IDC_DIFFERENCING) == BST_CHECKED; }
+
+    std::optional<std::wstring> BrowseForNewFile()
+    {
+        if (!IsDifferencing()) {
+            return ui::BrowseForFile(m_dialog, IDS_FILTER_VHD, true, L"vhd");
+        }
+        // A child has the format of its parent.
+        const wchar_t* extension = disk::DifferencingExtension(ui::GetText(m_dialog, IDC_PARENT));
+        if (!extension) {
+            return ui::BrowseForFile(m_dialog, IDS_FILTER_VIRTUAL_DISKS, true, nullptr);
+        }
+        return ui::BrowseForFile(m_dialog, i18n::Format(IDS_FILTER_DIFFERENCING, std::wstring(extension)), true,
+                                 extension + 1);
     }
 
     bool OnOk() override
@@ -197,6 +225,9 @@ private:
         if (m_path.empty()) {
             ui::ShowError(m_dialog, i18n::Str(IDS_ERR_NO_FILE));
             return false;
+        }
+        if (IsDifferencing()) {
+            return StartDifferencing();
         }
         const std::optional<uint64_t> sizeMb = ui::GetNumber(m_dialog, IDC_SIZE_MB, 1, kMaxSizeMb);
         if (!sizeMb) {
@@ -224,6 +255,36 @@ private:
                 });
             }
             PostMessageW(dialog, WM_APP_DONE, error, 0);
+        });
+        return false;
+    }
+
+    bool StartDifferencing()
+    {
+        const std::wstring parent = ui::GetText(m_dialog, IDC_PARENT);
+        if (parent.empty()) {
+            ui::ShowError(m_dialog, i18n::Str(IDS_ERR_NO_PARENT));
+            return false;
+        }
+        const wchar_t* extension = disk::DifferencingExtension(parent);
+        if (!extension) {
+            ui::ShowError(m_dialog, i18n::Str(IDS_ERR_PARENT_FORMAT));
+            return false;
+        }
+        const wchar_t* childExtension = disk::DifferencingExtension(m_path);
+        if (!childExtension || wcscmp(childExtension, extension) != 0) {
+            ui::ShowError(m_dialog, i18n::Format(IDS_ERR_CHILD_FORMAT, std::wstring(extension)));
+            return false;
+        }
+        SetWorking(true);
+        // Opening the parent reads its whole chain's metadata.
+        m_worker = std::thread([this, parent, path = m_path, dialog = m_dialog] {
+            disk::OpenError openError;
+            const std::unique_ptr<disk::Disk> disk = disk::OpenDiskImage(parent, true, openError);
+            if (!disk) {
+                m_parentError = openError;
+            }
+            PostMessageW(dialog, WM_APP_DONE, disk ? disk::CreateDifferencingImage(path, *disk) : openError.code, 0);
         });
         return false;
     }
@@ -257,6 +318,11 @@ private:
     {
         m_worker.join();
         SetWorking(false);
+        if (m_parentError) {
+            ui::ShowError(m_dialog, ui::ExplainOpenError(*m_parentError, false));
+            m_parentError.reset();
+            return;
+        }
         if (error == ERROR_CANCELLED) {
             EndDialog(m_dialog, IDCANCEL);
             return;
@@ -281,8 +347,21 @@ private:
     void SetWorking(bool working)
     {
         m_working = working;
-        for (int id : {IDC_PATH, IDC_BROWSE, IDC_SIZE_MB, IDC_SIZE_SPIN, IDC_DYNAMIC, IDOK}) {
-            EnableWindow(GetDlgItem(m_dialog, id), !working);
+        UpdateControls();
+    }
+
+    void UpdateControls()
+    {
+        const bool differencing = IsDifferencing();
+        for (int id : {IDC_PATH, IDC_BROWSE, IDC_DIFFERENCING, IDOK}) {
+            EnableWindow(GetDlgItem(m_dialog, id), !m_working);
+        }
+        // A child has the size of its parent.
+        for (int id : {IDC_SIZE_MB, IDC_SIZE_SPIN, IDC_DYNAMIC}) {
+            EnableWindow(GetDlgItem(m_dialog, id), !m_working && !differencing);
+        }
+        for (int id : {IDC_PARENT, IDC_BROWSE_PARENT}) {
+            EnableWindow(GetDlgItem(m_dialog, id), !m_working && differencing);
         }
     }
 
@@ -290,6 +369,7 @@ private:
     std::wstring m_path;
     std::thread m_worker;
     std::atomic<bool> m_cancel{false};
+    std::optional<disk::OpenError> m_parentError; // set by the worker before WM_APP_DONE
     bool m_working = false;
 };
 
